@@ -166,11 +166,6 @@ export class LoopDetectionService {
     return false;
   }
 
-  /**
-   * Detects content loops by analyzing streaming text for repetitive patterns.
-   *
-   * The algorithm works by:
-
   private checkContentLoop(content: string): boolean {
     // Code blocks can often contain repetitive syntax that is not indicative of a loop.
     // To avoid false positives, we detect when we are inside a code block and
@@ -190,56 +185,23 @@ export class LoopDetectionService {
     }
 
     this.streamContentHistory += content;
-
     this.truncateAndUpdate();
-    return this.analyzeContentChunksForLoop();
+    
+    // Disabled chunk-based duplicate detection to avoid false positives during code generation
+    // return this.analyzeContentChunksForLoop();
+    return false;
   }
 
   /**
-   * Quick check for obvious repetitive patterns like **"**"**" or similar
+   * Quick check for only the most obvious broken repetitive patterns
+   * Very conservative to avoid false positives in legitimate code/markdown
    */
   private hasObviousRepetition(content: string): boolean {
-    // Check both the new content and the recent accumulated history
-    const textsToCheck = [content];
+    // Only check for extreme character repetition (like infinite "aaaaa...")
+    // This catches truly broken generation, not legitimate patterns
+    const extremeRepeatPattern = /(.)\1{50,}/g; // 50+ identical characters in a row
     
-    // Also check the last 300 characters of accumulated history for patterns (increased from 200)
-    if (this.streamContentHistory.length > 0) {
-      const recentHistory = this.streamContentHistory.slice(-300);
-      textsToCheck.push(recentHistory);
-      // Check the combined recent history + new content
-      textsToCheck.push(recentHistory + content);
-    }
-
-    for (const text of textsToCheck) {
-      // Only check for very obvious repetitive patterns - much more conservative
-      
-      // Check for any single character repeated excessively (increased threshold)
-      const charRepeatPattern = /([^#\-*_=\s\.\,\"\'\(\)])\1{15,}/g; // Increased from 8 to 15
-      const charMatches = text.match(charRepeatPattern);
-      if (charMatches) {
-        return true;
-      }
-
-      // Check for very specific problematic patterns only
-      // Only trigger on obviously broken patterns like multiple quotes/stars in sequence
-      const brokenQuotePattern = /(\*\*")+\*\*"(\*\*")+/g; // Much more specific
-      if (brokenQuotePattern.test(text)) {
-        return true;
-      }
-
-      // Check for extremely dense repetitive content (very high threshold)
-      const suspiciousLength = 100;
-      if (text.length > suspiciousLength) {
-        const quoteCount = (text.match(/"/g) || []).length;
-        const starCount = (text.match(/\*/g) || []).length;
-        // Only trigger if >60% of content is quotes and stars (was 30%)
-        if (quoteCount > text.length * 0.6 && starCount > text.length * 0.6) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return extremeRepeatPattern.test(content);
   }
 
   /**
@@ -372,12 +334,9 @@ export class LoopDetectionService {
   }
 
   private async checkForLoopWithLLM(signal: AbortSignal) {
-    // Skip LLM loop detection for OpenAI models since generateJson doesn't work properly
+    // Enable LLM loop detection for all models, using text-based analysis for OpenAI-compatible models
     const contentGeneratorConfig = this.config.getContentGeneratorConfig();
-    if (contentGeneratorConfig?.authType === 'openai') {
-      this.config.getDebugMode() && console.log('[Loop Detection] Skipping LLM loop check for OpenAI models');
-      return false;
-    }
+    const isOpenAIModel = contentGeneratorConfig?.authType === 'openai';
 
     const recentHistory = this.config
       .getGeminiClient()
@@ -418,9 +377,55 @@ Please analyze the conversation history to determine the possibility that the co
     };
     let result;
     try {
-      result = await this.config
-        .getGeminiClient()
-        .generateJson(contents, schema, signal, DEFAULT_GEMINI_FLASH_MODEL);
+      if (isOpenAIModel) {
+        // For OpenAI-compatible models, use regular text generation and parse response
+        const textPrompt = prompt + `
+
+Please respond with a JSON object containing:
+- "reasoning": Your analysis of whether the conversation is stuck in an unproductive loop
+- "confidence": A number between 0.0 and 1.0 representing your confidence that the conversation is looping (1.0 = definitely looping, 0.0 = definitely not looping)
+
+Example: {"reasoning": "The assistant is making progress by...", "confidence": 0.2}`;
+
+        const response = await this.config
+          .getGeminiClient()
+          .generateContent(
+            [...recentHistory, { role: 'user', parts: [{ text: textPrompt }] }], 
+            {},
+            signal
+          );
+        
+        // Extract JSON from the response
+        const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[0]);
+        } else {
+          return false; // Couldn't parse response
+        }
+      } else {
+        // For Gemini models, use the structured generateJson approach
+        const schema: SchemaUnion = {
+          type: Type.OBJECT,
+          properties: {
+            reasoning: {
+              type: Type.STRING,
+              description:
+                'Your reasoning on if the conversation is looping without forward progress.',
+            },
+            confidence: {
+              type: Type.NUMBER,
+              description:
+                'A number between 0.0 and 1.0 representing your confidence that the conversation is in an unproductive state.',
+            },
+          },
+          required: ['reasoning', 'confidence'],
+        };
+        
+        result = await this.config
+          .getGeminiClient()
+          .generateJson(contents, schema, signal, DEFAULT_GEMINI_FLASH_MODEL);
+      }
     } catch (e) {
       // Do nothing, treat it as a non-loop.
       this.config.getDebugMode() ? console.error(e) : console.debug(e);
