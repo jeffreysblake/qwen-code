@@ -533,7 +533,15 @@ export const useGeminiStream = (
     addItem(
       {
         type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+        text: `🔄 A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.
+
+To recover, you can try:
+• Provide more specific instructions or context
+• Ask the model to approach the problem differently
+• Use "/clear" to reset the conversation context
+• Try a different approach to your original question
+
+The conversation is ready for your next input.`,
       },
       Date.now(),
     );

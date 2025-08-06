@@ -12,8 +12,8 @@ import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { SchemaUnion, Type } from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
-const CONTENT_LOOP_THRESHOLD = 10;
-const CONTENT_CHUNK_SIZE = 50;
+const CONTENT_LOOP_THRESHOLD = 2; // Further reduced from 3 to 2 for immediate detection
+const CONTENT_CHUNK_SIZE = 10; // Further reduced from 20 to 10 for faster detection
 const MAX_HISTORY_LENGTH = 1000;
 
 /**
@@ -68,6 +68,10 @@ export class LoopDetectionService {
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
   private lastCheckTurn = 0;
 
+  // Loop recovery tracking
+  private loopRecoveryAttempts = 0;
+  private readonly MAX_RECOVERY_ATTEMPTS = 2;
+
   constructor(config: Config) {
     this.config = config;
   }
@@ -96,7 +100,11 @@ export class LoopDetectionService {
         this.loopDetected = this.checkToolCallLoop(event.value);
         break;
       case GeminiEventType.Content:
+        console.error(`[LOOP DEBUG] Processing content event: "${event.value.substring(0, 50)}${event.value.length > 50 ? '...' : ''}"`);
         this.loopDetected = this.checkContentLoop(event.value);
+        if (this.loopDetected) {
+          console.error(`[LOOP DEBUG] LOOP DETECTED! Returning true`);
+        }
         break;
       default:
         break;
@@ -153,13 +161,7 @@ export class LoopDetectionService {
    * Detects content loops by analyzing streaming text for repetitive patterns.
    *
    * The algorithm works by:
-   * 1. Appending new content to the streaming history
-   * 2. Truncating history if it exceeds the maximum length
-   * 3. Analyzing content chunks for repetitive patterns using hashing
-   * 4. Detecting loops when identical chunks appear frequently within a short distance
-   * 5. Disabling loop detection within code blocks to prevent false positives,
-   *    as repetitive code structures are common and not necessarily loops.
-   */
+
   private checkContentLoop(content: string): boolean {
     // Code blocks can often contain repetitive syntax that is not indicative of a loop.
     // To avoid false positives, we detect when we are inside a code block and
@@ -180,8 +182,82 @@ export class LoopDetectionService {
 
     this.streamContentHistory += content;
 
+    // Debug: Log when we accumulate significant repetitive content
+    if (this.streamContentHistory.length > 100) {
+      const recentHistory = this.streamContentHistory.slice(-100);
+      if (/(\*\*")+/.test(recentHistory) && recentHistory.match(/(\*\*")+/g)?.some(match => match.length > 30)) {
+        console.error(`[LOOP DEBUG] Large repetitive pattern in history: "${recentHistory}"`);
+      }
+    }
+
     this.truncateAndUpdate();
     return this.analyzeContentChunksForLoop();
+  }
+
+  /**
+   * Quick check for obvious repetitive patterns like **"**"**" or similar
+   */
+  private hasObviousRepetition(content: string): boolean {
+    // Check both the new content and the recent accumulated history
+    const textsToCheck = [content];
+    
+    // Also check the last 200 characters of accumulated history for patterns
+    if (this.streamContentHistory.length > 0) {
+      const recentHistory = this.streamContentHistory.slice(-200);
+      textsToCheck.push(recentHistory);
+      // Check the combined recent history + new content
+      textsToCheck.push(recentHistory + content);
+    }
+
+    for (const text of textsToCheck) {
+      // Check for patterns like **"**"**" (quote repetition) - very aggressive
+      const quotePattern = /(\*\*")+/g;
+      const quoteMatches = text.match(quotePattern);
+      if (quoteMatches && quoteMatches.some(match => match.length > 5)) {
+        console.error(`[LOOP DEBUG] Quote pattern detected: ${quoteMatches.join(', ')}`);
+        return true;
+      }
+
+      // Check for any single character repeated many times (excluding normal punctuation)
+      const charRepeatPattern = /([^#\-*_=\s])\1{8,}/g; // Exclude markdown chars
+      const charMatches = text.match(charRepeatPattern);
+      if (charMatches) {
+        console.error(`[LOOP DEBUG] Character repetition detected: ${charMatches.join(', ')}`);
+        return true;
+      }
+
+      // Check for short patterns repeated multiple times - exclude common markdown
+      const shortPatterns = text.match(/(.{1,6})\1{3,}/g); // Increased threshold back to 3+
+      if (shortPatterns) {
+        // Filter out common markdown patterns
+        const suspiciousPatterns = shortPatterns.filter(pattern => {
+          const basePattern = pattern.match(/^(.+?)\1+$/)?.[1] || '';
+          // Skip common markdown: ###, ---, ***, ===, etc.
+          return !/^[#\-*_=\s]+$/.test(basePattern);
+        });
+        if (suspiciousPatterns.length > 0) {
+          console.error(`[LOOP DEBUG] Short pattern repetition detected: ${suspiciousPatterns.join(', ')}`);
+          return true;
+        }
+      }
+
+      // Specific check for the exact pattern we're seeing: **"**"**"
+      const specificPattern = /(\*\*"(\*\*)?){2,}/g;
+      if (specificPattern.test(text)) {
+        console.error(`[LOOP DEBUG] Specific **" pattern detected in: "${text.substring(0, 100)}"`);
+        return true;
+      }
+
+      // Check for quote-heavy content that looks suspicious
+      const quoteCount = (text.match(/"/g) || []).length;
+      const starCount = (text.match(/\*/g) || []).length;
+      if (text.length > 20 && quoteCount > text.length * 0.3 && starCount > text.length * 0.3) {
+        console.error(`[LOOP DEBUG] Suspicious quote/star density: quotes=${quoteCount}, stars=${starCount}, length=${text.length}`);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -387,11 +463,13 @@ Please analyze the conversation history to determine the possibility that the co
    * Resets all loop detection state.
    */
   reset(promptId: string): void {
+    console.error(`[LOOP DEBUG] Resetting loop detector for prompt: ${promptId}`);
     this.promptId = promptId;
     this.resetToolCallCount();
     this.resetContentTracking();
     this.resetLlmCheckTracking();
     this.loopDetected = false;
+    this.loopRecoveryAttempts = 0; // Reset recovery attempts for new prompt
   }
 
   private resetToolCallCount(): void {
@@ -411,5 +489,47 @@ Please analyze the conversation history to determine the possibility that the co
     this.turnsInCurrentPrompt = 0;
     this.llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
     this.lastCheckTurn = 0;
+  }
+
+  /**
+   * Gets suggested recovery prompts based on the type of loop detected
+   */
+  getLoopRecoveryPrompts(): string[] {
+    const basePrompts = [
+      "Let me take a step back and approach this differently. What specific aspect should I focus on first?",
+      "I notice I might be repeating myself. Can you provide more specific guidance on what you'd like me to do differently?",
+      "Let me break this down into smaller, more manageable steps. What's the most important part to address first?",
+    ];
+
+    const toolCallPrompts = [
+      "I seem to be stuck in a loop with tool calls. Let me try a different approach to this problem.",
+      "Instead of repeating the same operations, let me analyze what we've learned so far and adjust my strategy.",
+    ];
+
+    const contentPrompts = [
+      "I notice I'm generating repetitive content. Let me refocus on providing more specific and actionable information.",
+      "Let me restructure my response to be more targeted and avoid repetition.",
+    ];
+
+    // Return different prompts based on what type of loop was detected
+    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+      return [...basePrompts, ...toolCallPrompts];
+    } else {
+      return [...basePrompts, ...contentPrompts];
+    }
+  }
+
+  /**
+   * Attempts automatic recovery by suggesting the model take a different approach
+   */
+  shouldAttemptAutoRecovery(): boolean {
+    return this.loopRecoveryAttempts < this.MAX_RECOVERY_ATTEMPTS;
+  }
+
+  /**
+   * Marks that a recovery attempt has been made
+   */
+  recordRecoveryAttempt(): void {
+    this.loopRecoveryAttempts++;
   }
 }

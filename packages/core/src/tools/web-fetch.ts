@@ -16,6 +16,7 @@ import { Type } from '@google/genai';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config, ApprovalMode } from '../config/config.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { AuthType } from '../core/contentGenerator.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
@@ -235,6 +236,15 @@ ${textContent}
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
+      return this.executeFallback(params, signal);
+    }
+
+    // Check if we're using a non-Gemini model (OpenAI/LMStudio)
+    const contentGeneratorConfig = this.config.getContentGeneratorConfig();
+    const isOpenAIModel = contentGeneratorConfig?.authType === 'openai';
+    
+    if (isOpenAIModel) {
+      // Use fallback for OpenAI/LMStudio models since they don't support urlContext
       return this.executeFallback(params, signal);
     }
 
