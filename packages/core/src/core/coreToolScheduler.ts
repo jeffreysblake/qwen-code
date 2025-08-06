@@ -123,8 +123,9 @@ export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
 
 /**
  * Maximum length for tool output before truncation
+ * Optimized for Qwen3's 256K context window with 32GB RAM + RTX 4090
  */
-const MAX_TOOL_OUTPUT_LENGTH = 15000;
+const MAX_TOOL_OUTPUT_LENGTH = 50000;
 
 /**
  * Truncates tool output if it exceeds the maximum length

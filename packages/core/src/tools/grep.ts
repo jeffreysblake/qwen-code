@@ -542,6 +542,12 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
         'bower_components/**',
         '.svn/**',
         '.hg/**',
+        '.venv/**',
+        'venv/**',
+        '__pycache__/**',
+        '*.egg-info/**',
+        '.mypy_cache/**',
+        '.pytest_cache/**',
       ]; // Use glob patterns for ignores here
 
       const filesIterator = globIterate(globPattern, {
@@ -559,6 +565,13 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
       for await (const filePath of filesIterator) {
         const fileAbsolutePath = filePath as string;
         try {
+          // Check if this is actually a file (not a directory or symlink to directory)
+          const stats = await fsPromises.stat(fileAbsolutePath);
+          if (!stats.isFile()) {
+            console.debug(`GrepLogic: Skipping non-file: ${fileAbsolutePath}`);
+            continue;
+          }
+
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
           lines.forEach((line, index) => {
@@ -574,11 +587,25 @@ export class GrepTool extends BaseTool<GrepToolParams, ToolResult> {
           });
         } catch (readError: unknown) {
           // Ignore errors like permission denied or file gone during read
-          if (!isNodeError(readError) || readError.code !== 'ENOENT') {
-            console.debug(
-              `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
-            );
+          if (isNodeError(readError)) {
+            if (readError.code === 'ENOENT') {
+              // File disappeared during processing, ignore
+              continue;
+            } else if (readError.code === 'EISDIR') {
+              // This is a directory (shouldn't happen with nodir: true, but symlinks can slip through)
+              console.debug(`GrepLogic: Skipping directory: ${fileAbsolutePath}`);
+              continue;
+            } else if (readError.code === 'EACCES') {
+              // Permission denied, ignore
+              console.debug(`GrepLogic: Permission denied: ${fileAbsolutePath}`);
+              continue;
+            }
           }
+          
+          // Log other errors for debugging but don't fail the entire search
+          console.debug(
+            `GrepLogic: Could not read/process ${fileAbsolutePath}: ${getErrorMessage(readError)}`,
+          );
         }
       }
 
