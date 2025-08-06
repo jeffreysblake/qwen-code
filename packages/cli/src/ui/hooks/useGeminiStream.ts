@@ -529,6 +529,16 @@ export const useGeminiStream = (
     [addItem],
   );
 
+  const handleLoopRecoveryAttemptedEvent = useCallback((event: any) => {
+    addItem(
+      {
+        type: 'info',
+        text: `🔄 Auto-recovery attempt #${event.value.attemptNumber}: The model detected a loop and is trying a different approach...${event.value.compressionSuggested ? ' Context compression may be needed for better results.' : ''}`,
+      },
+      Date.now(),
+    );
+  }, [addItem]);
+
   const handleLoopDetectedEvent = useCallback(() => {
     addItem(
       {
@@ -599,6 +609,9 @@ The conversation is ready for your next input.`,
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
             loopDetectedRef.current = true;
+            break;
+          case ServerGeminiEventType.LoopRecoveryAttempted:
+            handleLoopRecoveryAttemptedEvent(event);
             break;
           default: {
             // enforces exhaustive switch-case

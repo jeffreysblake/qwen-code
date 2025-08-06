@@ -76,7 +76,7 @@ Create or edit `.qwen/settings.json` in your home directory:
 
 ```json
 {
-  "sessionTokenLimit": 32000
+  "sessionTokenLimit": 40000
 }
 ```
 

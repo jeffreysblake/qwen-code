@@ -1,0 +1,8 @@
+{
+  "sessionTokenLimit": 45000,
+  "model": "your-local-model-name",
+  "fullContext": false,
+  "maxSessionTurns": -1,
+  "maxFolderItems": 20,
+  "debug": true
+}

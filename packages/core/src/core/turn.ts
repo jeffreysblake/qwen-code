@@ -54,6 +54,7 @@ export enum GeminiEventType {
   SessionTokenLimitExceeded = 'session_token_limit_exceeded',
   Finished = 'finished',
   LoopDetected = 'loop_detected',
+  LoopRecoveryAttempted = 'loop_recovery_attempted',
 }
 
 export interface StructuredError {
@@ -159,6 +160,15 @@ export type ServerGeminiLoopDetectedEvent = {
   type: GeminiEventType.LoopDetected;
 };
 
+export type ServerGeminiLoopRecoveryAttemptedEvent = {
+  type: GeminiEventType.LoopRecoveryAttempted;
+  value: {
+    recoveryPrompt: string;
+    attemptNumber: number;
+    compressionSuggested: boolean;
+  };
+};
+
 // The original union type, now composed of the individual types
 export type ServerGeminiStreamEvent =
   | ServerGeminiContentEvent
@@ -172,7 +182,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiMaxSessionTurnsEvent
   | ServerGeminiSessionTokenLimitExceededEvent
   | ServerGeminiFinishedEvent
-  | ServerGeminiLoopDetectedEvent;
+  | ServerGeminiLoopDetectedEvent
+  | ServerGeminiLoopRecoveryAttemptedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {

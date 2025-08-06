@@ -76,6 +76,13 @@ export class LoopDetectionService {
     this.config = config;
   }
 
+  /**
+   * Gets the current number of recovery attempts
+   */
+  get recoveryAttempts(): number {
+    return this.loopRecoveryAttempts;
+  }
+
   private getToolCallKey(toolCall: { name: string; args: object }): string {
     const argsString = JSON.stringify(toolCall.args);
     const keyString = `${toolCall.name}:${argsString}`;
@@ -98,6 +105,12 @@ export class LoopDetectionService {
         // is a tool call in between
         this.resetContentTracking();
         this.loopDetected = this.checkToolCallLoop(event.value);
+        break;
+      case GeminiEventType.ToolCallResponse:
+        // Tool responses should not trigger loop detection as they are external data
+        // Reset content tracking since tool responses break content flow
+        this.resetContentTracking();
+        console.log(`[Tool Response] ${event.value.callId}: Output length ${JSON.stringify(event.value.responseParts).length} chars`);
         break;
       case GeminiEventType.Content:
         console.error(`[LOOP DEBUG] Processing content event: "${event.value.substring(0, 50)}${event.value.length > 50 ? '...' : ''}"`);
@@ -477,7 +490,10 @@ Please analyze the conversation history to determine the possibility that the co
     this.toolCallRepetitionCount = 0;
   }
 
-  private resetContentTracking(resetHistory = true): void {
+  /**
+   * Public method to reset content tracking for recovery attempts
+   */
+  resetContentTracking(resetHistory = true): void {
     if (resetHistory) {
       this.streamContentHistory = '';
     }
@@ -517,6 +533,47 @@ Please analyze the conversation history to determine the possibility that the co
     } else {
       return [...basePrompts, ...contentPrompts];
     }
+  }
+
+  /**
+   * Gets an automatic recovery prompt that can be injected to break the loop
+   */
+  getAutoRecoveryPrompt(): string {
+    const recoveryPrompts = [
+      "I notice I'm in a repetitive pattern. Let me step back and approach this task from a different angle. What would be the most effective way to make progress on your original request?",
+      "I'm detecting that I may be stuck in a loop. Let me refocus on your core objective and try a more targeted approach. Can you help me understand what specific outcome you're looking for?",
+      "I seem to be repeating myself without making meaningful progress. Let me take a different approach and break this down into smaller, more manageable steps. What's the most important aspect to address first?",
+    ];
+
+    // Cycle through different recovery prompts to avoid getting stuck in recovery loops
+    return recoveryPrompts[this.loopRecoveryAttempts % recoveryPrompts.length];
+  }
+
+  /**
+   * Suggests context compression when loops are detected due to conversation length
+   */
+  shouldCompressContext(): boolean {
+    // Suggest compression if we've had multiple recovery attempts
+    // or if the conversation history is getting very long
+    return this.loopRecoveryAttempts >= 1 || this.turnsInCurrentPrompt > 50;
+  }
+
+  /**
+   * Gets a compression prompt that summarizes the conversation for continuation
+   */
+  getContextCompressionPrompt(): string {
+    return `I notice this conversation has become quite long and I may be losing track of the main objectives. Let me summarize what we've accomplished so far and refocus on the remaining goals:
+
+**Summary of Progress:**
+- [Previous accomplishments will be summarized here]
+
+**Current Objective:**
+- [Main goal will be restated here]
+
+**Next Steps:**
+- [Specific actionable steps will be outlined here]
+
+Please confirm if this summary is accurate and let me know what specific aspect you'd like me to focus on next.`;
   }
 
   /**

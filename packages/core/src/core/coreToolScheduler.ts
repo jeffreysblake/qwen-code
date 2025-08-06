@@ -122,6 +122,26 @@ export type AllToolCallsCompleteHandler = (
 export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
 
 /**
+ * Maximum length for tool output before truncation
+ */
+const MAX_TOOL_OUTPUT_LENGTH = 15000;
+
+/**
+ * Truncates tool output if it exceeds the maximum length
+ */
+function truncateToolOutput(output: string, toolName: string): string {
+  if (output.length <= MAX_TOOL_OUTPUT_LENGTH) {
+    return output;
+  }
+  
+  // Log when truncation occurs for debugging
+  console.log(`[Tool Output] Truncating ${toolName} output: ${output.length} chars -> ${MAX_TOOL_OUTPUT_LENGTH} chars`);
+  
+  const truncated = output.substring(0, MAX_TOOL_OUTPUT_LENGTH);
+  return `${truncated}\n\n... (Tool output truncated - ${output.length} chars total, showing first ${MAX_TOOL_OUTPUT_LENGTH} chars. Consider refining your ${toolName} query to get more focused results.)`;
+}
+
+/**
  * Formats tool output for a Gemini FunctionResponse.
  */
 function createFunctionResponsePart(
@@ -129,11 +149,12 @@ function createFunctionResponsePart(
   toolName: string,
   output: string,
 ): Part {
+  const truncatedOutput = truncateToolOutput(output, toolName);
   return {
     functionResponse: {
       id: callId,
       name: toolName,
-      response: { output },
+      response: { output: truncatedOutput },
     },
   };
 }
@@ -161,7 +182,6 @@ export function convertToFunctionResponse(
     return [functionResponse, ...contentToProcess];
   }
 
-  // After this point, contentToProcess is a single Part object.
   if (contentToProcess.functionResponse) {
     if (contentToProcess.functionResponse.response?.content) {
       const stringifiedOutput =

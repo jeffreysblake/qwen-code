@@ -102,6 +102,11 @@ export class GeminiClient {
    */
   private readonly COMPRESSION_TOKEN_THRESHOLD = 0.7;
   /**
+   * Threshold for compression based on session token limit.
+   * If the chat history exceeds this fraction of the session limit, it will be compressed.
+   */
+  private readonly SESSION_COMPRESSION_THRESHOLD = 0.8;
+  /**
    * The fraction of the latest chat history to keep. A value of 0.3
    * means that only the last 30% of the chat history will be kept after compression.
    */
@@ -472,8 +477,55 @@ export class GeminiClient {
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
-        yield { type: GeminiEventType.LoopDetected };
-        return turn;
+        // Check if we should attempt auto-recovery
+        if (this.loopDetector.shouldAttemptAutoRecovery()) {
+          this.loopDetector.recordRecoveryAttempt();
+          
+          const recoveryPrompt = this.loopDetector.getAutoRecoveryPrompt();
+          const compressionSuggested = this.loopDetector.shouldCompressContext();
+          
+          // Emit recovery event with details
+          yield { 
+            type: GeminiEventType.LoopRecoveryAttempted,
+            value: {
+              recoveryPrompt,
+              attemptNumber: this.loopDetector.recoveryAttempts,
+              compressionSuggested
+            }
+          };
+
+          // If compression is suggested, we could trigger chat compression here
+          if (compressionSuggested) {
+            // For now, just emit the loop detected event and let the caller handle compression
+            yield { type: GeminiEventType.LoopDetected };
+            return turn;
+          }
+
+          // Attempt auto-recovery by continuing with the recovery prompt
+          try {
+            // Reset the loop detector state for recovery attempt
+            this.loopDetector.resetContentTracking(false); // Keep history but reset tracking
+            
+            // Continue the conversation with the recovery prompt
+            const recoveryRequest = [{ text: recoveryPrompt }];
+            yield* this.sendMessageStream(
+              recoveryRequest,
+              signal,
+              prompt_id,
+              boundedTurns - 1,
+              initialModel,
+            );
+            return turn;
+          } catch (error) {
+            // If recovery fails, fall back to normal loop detection
+            yield { type: GeminiEventType.LoopDetected };
+            return turn;
+          }
+        } else {
+          // No more recovery attempts, emit loop detected
+          yield { type: GeminiEventType.LoopDetected };
+          return turn;
+        }
       }
       yield event;
     }
@@ -723,10 +775,18 @@ export class GeminiClient {
       return null;
     }
 
-    // Don't compress if not forced and we are under the limit.
+    // Check both model-based and session-based compression thresholds
+    const modelTokenThreshold = this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model);
+    const sessionTokenLimit = this.config.getSessionTokenLimit();
+    const sessionTokenThreshold = sessionTokenLimit > 0 
+      ? this.SESSION_COMPRESSION_THRESHOLD * sessionTokenLimit 
+      : Infinity;
+    
+    // Don't compress if not forced and we are under both limits
     if (
       !force &&
-      originalTokenCount < this.COMPRESSION_TOKEN_THRESHOLD * tokenLimit(model)
+      originalTokenCount < modelTokenThreshold &&
+      originalTokenCount < sessionTokenThreshold
     ) {
       return null;
     }

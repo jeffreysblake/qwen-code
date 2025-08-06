@@ -93,6 +93,13 @@ export async function runNonInteractive(
             console.error('• Provide additional context or constraints');
             console.error('• Consider using a different approach to solve the problem');
             return;
+          case ServerGeminiEventType.LoopRecoveryAttempted:
+            console.error(`\n🔄 Auto-recovery attempt #${event.value.attemptNumber}: Trying a different approach...`);
+            if (config.getDebugMode()) {
+              console.error(`[RECOVERY] Prompt: ${event.value.recoveryPrompt.substring(0, 100)}...`);
+              console.error(`[RECOVERY] Compression suggested: ${event.value.compressionSuggested}`);
+            }
+            break;
           case ServerGeminiEventType.MaxSessionTurns:
             console.error('\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.');
             return;
