@@ -15,7 +15,7 @@ import {
 } from '@qwen-code/qwen-code-core';
 import { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { vi } from 'vitest';
+import { vi, describe, beforeEach, afterEach, it, expect } from 'vitest';
 
 // Mock core modules
 vi.mock('@qwen-code/qwen-code-core', async (importOriginal) => {

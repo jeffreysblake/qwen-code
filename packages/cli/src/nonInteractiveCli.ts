@@ -12,9 +12,8 @@ import {
   isTelemetrySdkInitialized,
   parseAndFormatApiError,
   GeminiEventType as ServerGeminiEventType,
-  ServerGeminiStreamEvent as GeminiEvent,
 } from '@qwen-code/qwen-code-core';
-import { Content, Part, FunctionCall } from '@google/genai';
+import { Part, FunctionCall } from '@google/genai';
 
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 
@@ -44,7 +43,7 @@ export async function runNonInteractive(
     // let currentMessages: Content[] = [
     //   { role: 'user', parts: [{ text: input }] },
     // ];
-    let currentRequest = [{ text: input }]; // Start with the initial input
+    let currentRequest: Part[] = [{ text: input }]; // Start with the initial input
     let turnCount = 0;
     while (true) {
       turnCount++;
@@ -171,9 +170,17 @@ export async function runNonInteractive(
         }
         //currentMessages = [{ role: 'user', parts: toolResponseParts }];
         // Set the next request to be the tool responses
-        currentRequest = toolResponseParts.filter((part): part is { text: string } => 
-          typeof part.text === 'string' && part.text.length > 0
-        );
+        currentRequest = toolResponseParts.filter((part): part is Part => {
+          // Keep text parts that are non-empty
+          if (part.text && typeof part.text === 'string' && part.text.length > 0) {
+            return true;
+          }
+          // Keep function response parts (for error handling)
+          if ('functionResponse' in part && part.functionResponse) {
+            return true;
+          }
+          return false;
+        });
       } else {
         process.stdout.write('\n'); // Ensure a final newline
         return;

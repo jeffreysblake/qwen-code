@@ -267,16 +267,35 @@ export abstract class DeclarativeTool<
  * validates parameters before deferring to a `createInvocation` method for
  * the final `ToolInvocation` object instantiation.
  */
+/**
+ * Normalizes parameter values that may have been converted to Python-style strings.
+ * Specifically handles boolean conversion from "True"/"False" strings back to booleans.
+ */
+function normalizeParams<T extends object>(params: T): T {
+  const normalized = { ...params };
+  
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value === 'True') {
+      (normalized as any)[key] = true;
+    } else if (value === 'False') {
+      (normalized as any)[key] = false;
+    }
+  }
+  
+  return normalized;
+}
+
 export abstract class BaseDeclarativeTool<
   TParams extends object,
   TResult extends ToolResult,
 > extends DeclarativeTool<TParams, TResult> {
   build(params: TParams): ToolInvocation<TParams, TResult> {
-    const validationError = this.validateToolParams(params);
+    const normalizedParams = normalizeParams(params);
+    const validationError = this.validateToolParams(normalizedParams);
     if (validationError) {
       throw new Error(validationError);
     }
-    return this.createInvocation(params);
+    return this.createInvocation(normalizedParams);
   }
 
   override validateToolParams(params: TParams): string | null {

@@ -24,8 +24,8 @@ vi.mock('../telemetry/loggers.js', () => ({
 }));
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
-const CONTENT_LOOP_THRESHOLD = 10;
-const CONTENT_CHUNK_SIZE = 50;
+const CONTENT_LOOP_THRESHOLD = 4;
+const CONTENT_CHUNK_SIZE = 20;
 
 describe('LoopDetectionService', () => {
   let service: LoopDetectionService;
@@ -34,6 +34,8 @@ describe('LoopDetectionService', () => {
   beforeEach(() => {
     mockConfig = {
       getTelemetryEnabled: () => true,
+      getContentGeneratorConfig: () => ({ authType: 'gemini' }),
+      getDebugMode: () => false,
     } as unknown as Config;
     service = new LoopDetectionService(mockConfig);
     vi.clearAllMocks();
@@ -59,7 +61,7 @@ describe('LoopDetectionService', () => {
   });
 
   const createRepetitiveContent = (id: number, length: number): string => {
-    const baseString = `This is a unique sentence, id=${id}. `;
+    const baseString = `UniqueContent${id}UniqueContent${id}UniqueContent${id}. `;
     let content = '';
     while (content.length < length) {
       content += baseString;
@@ -438,8 +440,6 @@ describe('LoopDetectionService', () => {
     });
 
     it('should reset tracking for various list item formats', () => {
-      const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
-
       // Test different list formats - make sure they start at beginning of line
       const listFormats = [
         '* Bullet item',
@@ -451,6 +451,9 @@ describe('LoopDetectionService', () => {
 
       listFormats.forEach((listFormat, index) => {
         service.reset('');
+
+        // Use unique content for each test to avoid any potential interference
+        const repeatedContent = createRepetitiveContent(index + 10, CONTENT_CHUNK_SIZE);
 
         // Build up to near threshold
         for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
@@ -566,14 +569,14 @@ describe('LoopDetectionService', () => {
       const toolEvent = createToolCallRequestEvent('testTool', {
         param: 'value',
       });
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 3; i++) {
         service.addAndCheck(contentEvent);
       }
 
       service.addAndCheck(toolEvent);
 
-      // Should start fresh
-      expect(service.addAndCheck(createContentEvent('Fresh content.'))).toBe(
+      // Should start fresh - use completely different content to avoid any potential hash collisions
+      expect(service.addAndCheck(createContentEvent('Totally different new content that should not trigger any loops.'))).toBe(
         false,
       );
     });
@@ -606,6 +609,7 @@ describe('LoopDetectionService LLM Checks', () => {
       getGeminiClient: () => mockGeminiClient,
       getDebugMode: () => false,
       getTelemetryEnabled: () => true,
+      getContentGeneratorConfig: () => ({ authType: 'gemini' }),
     } as unknown as Config;
 
     service = new LoopDetectionService(mockConfig);

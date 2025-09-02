@@ -189,6 +189,11 @@ export class LoopDetectionService {
 
     this.streamContentHistory += content;
 
+    // Quick check for obvious repetitions before expensive chunk analysis
+    if (this.hasObviousRepetition(content)) {
+      return true;
+    }
+
     this.truncateAndUpdate();
     return this.analyzeContentChunksForLoop();
   }
