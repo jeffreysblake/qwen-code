@@ -558,11 +558,29 @@ export const useGeminiStream = (
     [addItem],
   );
 
+   const handleLoopRecoveryAttemptedEvent = useCallback((event: any) => {
+    addItem(
+      {
+        type: 'info',
+        text: `🔄 Auto-recovery attempt #${event.value.attemptNumber}: The model detected a loop and is trying a different approach...${event.value.compressionSuggested ? ' Context compression may be needed for better results.' : ''}`,
+      },
+      Date.now(),
+    );
+  }, [addItem]);
+
   const handleLoopDetectedEvent = useCallback(() => {
     addItem(
       {
         type: 'info',
-        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.`,
+        text: `A potential loop was detected. This can happen due to repetitive tool calls or other model behavior. The request has been halted.
+
+                To recover, you can try:
+                • Provide more specific instructions or context
+                • Ask the model to approach the problem differently
+                • Use "/clear" to reset the conversation context
+                • Try a different approach to your original question
+
+                The conversation is ready for your next input.`,
       },
       Date.now(),
     );
@@ -620,6 +638,9 @@ export const useGeminiStream = (
             // handle later because we want to move pending history to history
             // before we add loop detected message to history
             loopDetectedRef.current = true;
+            break;
+          case ServerGeminiEventType.LoopRecoveryAttempted:
+            handleLoopRecoveryAttemptedEvent(event);
             break;
           default: {
             // enforces exhaustive switch-case

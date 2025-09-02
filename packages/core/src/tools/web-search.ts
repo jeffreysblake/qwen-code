@@ -12,6 +12,7 @@ import {
   ToolResult,
 } from './tools.js';
 
+// import { AuthType } from '../core/contentGenerator.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { Config } from '../config/config.js';
 

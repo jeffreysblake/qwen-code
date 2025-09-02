@@ -11,8 +11,8 @@ import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
-const CONTENT_LOOP_THRESHOLD = 10;
-const CONTENT_CHUNK_SIZE = 50;
+const CONTENT_LOOP_THRESHOLD = 4;
+const CONTENT_CHUNK_SIZE = 20;
 const MAX_HISTORY_LENGTH = 1000;
 
 /**
@@ -66,6 +66,10 @@ export class LoopDetectionService {
   private turnsInCurrentPrompt = 0;
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
   private lastCheckTurn = 0;
+
+  // Loop recovery tracking
+  private loopRecoveryAttempts = 0;
+  private readonly MAX_RECOVERY_ATTEMPTS = 2;
 
   constructor(config: Config) {
     this.config = config;
@@ -189,6 +193,46 @@ export class LoopDetectionService {
     return this.analyzeContentChunksForLoop();
   }
 
+  private hasObviousRepetition(content: string): boolean {
+    // Check both the new content and the recent accumulated history
+    const textsToCheck = [content];
+    
+    // Also check the last 300 characters of accumulated history for patterns
+    if (this.streamContentHistory.length > 0) {
+      const recentHistory = this.streamContentHistory.slice(-300);
+      textsToCheck.push(recentHistory);
+      // Check the combined recent history + new content
+      textsToCheck.push(recentHistory + content);
+    }
+
+    for (const text of textsToCheck) {
+      const charRepeatPattern = /([^#\-*_=\s\.\,\"\'\(\)])\1{15,}/g; // Increased from 8 to 15
+      const charMatches = text.match(charRepeatPattern);
+      if (charMatches) {
+        console.error(`[LOOP DEBUG] Character repetition detected: ${charMatches.join(', ')}`);
+        return true;
+      }
+
+      // Check for short patterns repeated multiple times - exclude common markdown
+      const brokenQuotePattern = /(\*\*")+\*\*"(\*\*")+/g; // Much more specific
+      if (brokenQuotePattern.test(text)) {
+        return true;
+      }
+
+     // Check for extremely dense repetitive content (very high threshold)
+      const suspiciousLength = 100;
+      if (text.length > suspiciousLength) {
+        const quoteCount = (text.match(/"/g) || []).length;
+        const starCount = (text.match(/\*/g) || []).length;
+        // Only trigger if >60% of content is quotes and stars (was 30%)
+        if (quoteCount > text.length * 0.6 && starCount > text.length * 0.6) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
   /**
    * Truncates the content history to prevent unbounded memory growth.
    * When truncating, adjusts all stored indices to maintain their relative positions.
@@ -298,7 +342,7 @@ export class LoopDetectionService {
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
     const averageDistance = totalDistance / (CONTENT_LOOP_THRESHOLD - 1);
-    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 1.5;
+    const maxAllowedDistance = CONTENT_CHUNK_SIZE * 2.0;
 
     return averageDistance <= maxAllowedDistance;
   }
@@ -319,6 +363,13 @@ export class LoopDetectionService {
   }
 
   private async checkForLoopWithLLM(signal: AbortSignal) {
+    // Skip LLM loop detection for OpenAI models since generateJson doesn't work properly
+    const contentGeneratorConfig = this.config.getContentGeneratorConfig();
+    if (contentGeneratorConfig?.authType === 'openai') {
+      this.config.getDebugMode() && console.log('[Loop Detection] Skipping LLM loop check for OpenAI models');
+      return false;
+    }
+    
     const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
@@ -397,6 +448,7 @@ Please analyze the conversation history to determine the possibility that the co
     this.resetContentTracking();
     this.resetLlmCheckTracking();
     this.loopDetected = false;
+    this.loopRecoveryAttempts = 0;
   }
 
   private resetToolCallCount(): void {
@@ -416,5 +468,47 @@ Please analyze the conversation history to determine the possibility that the co
     this.turnsInCurrentPrompt = 0;
     this.llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
     this.lastCheckTurn = 0;
+  }
+
+  /**
+   * Gets suggested recovery prompts based on the type of loop detected
+   */
+  getLoopRecoveryPrompts(): string[] {
+    const basePrompts = [
+      "Let me take a step back and approach this differently. What specific aspect should I focus on first?",
+      "I notice I might be repeating myself. Can you provide more specific guidance on what you'd like me to do differently?",
+      "Let me break this down into smaller, more manageable steps. What's the most important part to address first?",
+    ];
+
+    const toolCallPrompts = [
+      "I seem to be stuck in a loop with tool calls. Let me try a different approach to this problem.",
+      "Instead of repeating the same operations, let me analyze what we've learned so far and adjust my strategy.",
+    ];
+
+    const contentPrompts = [
+      "I notice I'm generating repetitive content. Let me refocus on providing more specific and actionable information.",
+      "Let me restructure my response to be more targeted and avoid repetition.",
+    ];
+
+    // Return different prompts based on what type of loop was detected
+    if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+      return [...basePrompts, ...toolCallPrompts];
+    } else {
+      return [...basePrompts, ...contentPrompts];
+    }
+  }
+
+  /**
+   * Attempts automatic recovery by suggesting the model take a different approach
+   */
+  shouldAttemptAutoRecovery(): boolean {
+    return this.loopRecoveryAttempts < this.MAX_RECOVERY_ATTEMPTS;
+  }
+
+  /**
+   * Marks that a recovery attempt has been made
+   */
+  recordRecoveryAttempt(): void {
+    this.loopRecoveryAttempts++;
   }
 }

@@ -100,7 +100,10 @@ const MAX_TURNS = 100;
  * If the chat history exceeds this threshold, it will be compressed.
  */
 const COMPRESSION_TOKEN_THRESHOLD = 0.7;
-
+/** Threshold for compression based on session token limit.
+ * If the chat history exceeds this fraction of the session limit, it will be compressed.
+ */
+const SESSION_COMPRESSION_THRESHOLD = 0.8;
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
  * means that only the last 30% of the chat history will be kept after compression.
