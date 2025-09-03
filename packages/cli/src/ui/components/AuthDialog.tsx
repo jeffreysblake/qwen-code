@@ -17,6 +17,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { OpenAIKeyPrompt } from './OpenAIKeyPrompt.js';
+import { LocalConfigPrompt } from './LocalConfigPrompt.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
 interface AuthDialogProps {
@@ -46,9 +47,11 @@ export function AuthDialog({
     initialErrorMessage || null,
   );
   const [showOpenAIKeyPrompt, setShowOpenAIKeyPrompt] = useState(false);
+  const [showLocalConfigPrompt, setShowLocalConfigPrompt] = useState(false);
   const items = [
     { label: 'Qwen OAuth', value: AuthType.QWEN_OAUTH },
     { label: 'OpenAI', value: AuthType.USE_OPENAI },
+    { label: 'Local', value: AuthType.LOCAL },
   ];
 
   const initialAuthIndex = Math.max(
@@ -82,6 +85,12 @@ export function AuthDialog({
       ) {
         setShowOpenAIKeyPrompt(true);
         setErrorMessage(null);
+      } else if (
+        authMethod === AuthType.LOCAL &&
+        (!process.env['OPENAI_API_KEY'] || !process.env['OPENAI_BASE_URL'] || !process.env['OPENAI_MODEL'])
+      ) {
+        setShowLocalConfigPrompt(true);
+        setErrorMessage(null);
       } else {
         setErrorMessage(error);
       }
@@ -108,9 +117,26 @@ export function AuthDialog({
     setErrorMessage('OpenAI API key is required to use OpenAI authentication.');
   };
 
+  const handleLocalConfigSubmit = (
+    apiKey: string,
+    baseUrl: string,
+    model: string,
+  ) => {
+    setOpenAIApiKey(apiKey);
+    setOpenAIBaseUrl(baseUrl);
+    setOpenAIModel(model);
+    setShowLocalConfigPrompt(false);
+    onSelect(AuthType.LOCAL, SettingScope.User);
+  };
+
+  const handleLocalConfigCancel = () => {
+    setShowLocalConfigPrompt(false);
+    setErrorMessage('Local configuration is required to use local model authentication.');
+  };
+
   useKeypress(
     (key) => {
-      if (showOpenAIKeyPrompt) {
+      if (showOpenAIKeyPrompt || showLocalConfigPrompt) {
         return;
       }
 
@@ -138,6 +164,15 @@ export function AuthDialog({
       <OpenAIKeyPrompt
         onSubmit={handleOpenAIKeySubmit}
         onCancel={handleOpenAIKeyCancel}
+      />
+    );
+  }
+
+  if (showLocalConfigPrompt) {
+    return (
+      <LocalConfigPrompt
+        onSubmit={handleLocalConfigSubmit}
+        onCancel={handleLocalConfigCancel}
       />
     );
   }

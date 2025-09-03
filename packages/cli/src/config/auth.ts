@@ -52,6 +52,15 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
+  if (authMethod === AuthType.LOCAL) {
+    // Local auth uses environment variables that are set interactively
+    // Check if required environment variables are set
+    if (!process.env['OPENAI_API_KEY'] || !process.env['OPENAI_BASE_URL'] || !process.env['OPENAI_MODEL']) {
+      return 'Local authentication requires OPENAI_API_KEY, OPENAI_BASE_URL, and OPENAI_MODEL to be configured. These will be prompted for interactively.';
+    }
+    return null;
+  }
+
   return 'Invalid auth method selected.';
 };
 

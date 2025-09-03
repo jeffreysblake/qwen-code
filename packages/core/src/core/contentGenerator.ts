@@ -49,6 +49,7 @@ export enum AuthType {
   CLOUD_SHELL = 'cloud-shell',
   USE_OPENAI = 'openai',
   QWEN_OAUTH = 'qwen-oauth',
+  LOCAL = 'local',
 }
 
 export type ContentGeneratorConfig = {
@@ -150,6 +151,15 @@ export function createContentGeneratorConfig(
     return contentGeneratorConfig;
   }
 
+  if (authType === AuthType.LOCAL && openaiApiKey) {
+    // LOCAL auth type uses the same configuration as OpenAI but is selected differently
+    contentGeneratorConfig.apiKey = openaiApiKey;
+    contentGeneratorConfig.baseUrl = openaiBaseUrl;
+    contentGeneratorConfig.model = openaiModel || DEFAULT_QWEN_MODEL;
+
+    return contentGeneratorConfig;
+  }
+
   return contentGeneratorConfig;
 }
 
@@ -202,9 +212,9 @@ export async function createContentGenerator(
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
 
-  if (config.authType === AuthType.USE_OPENAI) {
+  if (config.authType === AuthType.USE_OPENAI || config.authType === AuthType.LOCAL) {
     if (!config.apiKey) {
-      throw new Error('OpenAI API key is required');
+      throw new Error('API key is required for OpenAI/Local authentication');
     }
 
     // Import OpenAIContentGenerator dynamically to avoid circular dependencies

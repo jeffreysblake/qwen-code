@@ -32,6 +32,8 @@ describe('validateNonInterActiveAuth', () => {
     delete process.env['GOOGLE_GENAI_USE_VERTEXAI'];
     delete process.env['GOOGLE_GENAI_USE_GCA'];
     delete process.env['OPENAI_API_KEY'];
+    delete process.env['OPENAI_BASE_URL'];
+    delete process.env['OPENAI_MODEL'];
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
@@ -60,6 +62,8 @@ describe('validateNonInterActiveAuth', () => {
     } else {
       delete process.env['OPENAI_API_KEY'];
     }
+    delete process.env['OPENAI_BASE_URL'];
+    delete process.env['OPENAI_MODEL'];
     vi.restoreAllMocks();
   });
 
@@ -198,6 +202,71 @@ describe('validateNonInterActiveAuth', () => {
       nonInteractiveConfig,
     );
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_GEMINI);
+  });
+
+  it('uses LOCAL if local OpenAI configuration is detected', async () => {
+    process.env['OPENAI_API_KEY'] = 'lm-studio';
+    process.env['OPENAI_BASE_URL'] = 'http://localhost:1234/v1';
+    process.env['OPENAI_MODEL'] = 'test-model';
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOCAL);
+  });
+
+  it('uses LOCAL if local IP configuration is detected', async () => {
+    process.env['OPENAI_API_KEY'] = 'lm-studio';
+    process.env['OPENAI_BASE_URL'] = 'http://127.0.0.1:1234/v1';
+    process.env['OPENAI_MODEL'] = 'test-model';
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOCAL);
+  });
+
+  it('uses USE_OPENAI if OpenAI configuration is detected with external URL', async () => {
+    process.env['OPENAI_API_KEY'] = 'sk-123';
+    process.env['OPENAI_BASE_URL'] = 'https://api.openai.com/v1';
+    process.env['OPENAI_MODEL'] = 'gpt-4';
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    await validateNonInteractiveAuth(
+      undefined,
+      undefined,
+      nonInteractiveConfig,
+    );
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.USE_OPENAI);
+  });
+
+  it('prioritizes env auth type over configured auth type if env is valid', async () => {
+    // Set env vars for LOCAL auth
+    process.env['OPENAI_API_KEY'] = 'lm-studio';
+    process.env['OPENAI_BASE_URL'] = 'http://localhost:1234/v1';
+    process.env['OPENAI_MODEL'] = 'test-model';
+    
+    const nonInteractiveConfig: NonInteractiveConfig = {
+      refreshAuth: refreshAuthMock,
+    };
+    
+    // Pass a different configured auth type but env should take precedence
+    await validateNonInteractiveAuth(
+      AuthType.QWEN_OAUTH,
+      undefined,
+      nonInteractiveConfig,
+    );
+    
+    expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOCAL);
   });
 
   it('uses configuredAuthType if provided', async () => {
