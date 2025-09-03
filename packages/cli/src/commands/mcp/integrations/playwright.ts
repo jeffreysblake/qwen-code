@@ -15,6 +15,8 @@ export interface PlaywrightIntegrationOptions {
   timeout?: number;
   includeTools?: string[];
   excludeTools?: string[];
+  enableFallback?: boolean;  // Enable fallback to non-headless on anti-scraping detection
+  retryAttempts?: number;    // Number of retry attempts before fallback
 }
 
 /**
@@ -52,7 +54,7 @@ export class PlaywrightMCPIntegration extends BaseMCPIntegration {
       console.log('🧪 Testing Playwright MCP server availability...');
       execSync('npx --yes @playwright/mcp@latest --help', { stdio: 'pipe', timeout: 30000 });
       console.log('✅ Playwright MCP server is available');
-    } catch (error) {
+    } catch (_error) {
       throw new Error('Failed to verify Playwright MCP server availability. Please check your internet connection and npm configuration.');
     }
   }
@@ -60,22 +62,52 @@ export class PlaywrightMCPIntegration extends BaseMCPIntegration {
   getServerConfig(options: PlaywrightIntegrationOptions = {}): MCPServerConfig {
     const {
       headless = true,
-      browser = 'chromium',
+      browser = 'firefox',
       viewport = { width: 1280, height: 720 },
       timeout = 30000,
       includeTools,
       excludeTools,
+      enableFallback = true,
+      retryAttempts = 2,
     } = options;
+
+    const args = ['@playwright/mcp@latest'];
+    
+    // Add browser selection
+    args.push('--browser', browser);
+    
+    // Add headless mode
+    if (headless) {
+      args.push('--headless');
+    }
+    
+    // Add viewport size
+    args.push('--viewport-size', `${viewport.width},${viewport.height}`);
+    
+    // Add isolated mode to prevent persistent browser data
+    args.push('--isolated');
+    
+    // Add stealth user agent
+    args.push('--user-agent', 'Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0');
+    
+    // Ignore HTTPS errors for better compatibility
+    args.push('--ignore-https-errors');
+    
+    // Disable sandbox for headless mode (common requirement in containers)
+    if (headless) {
+      args.push('--no-sandbox');
+    }
+    
+    // Set output directory to current working directory for screenshots and traces
+    args.push('--output-dir', process.cwd());
 
     return {
       command: 'npx',
-      args: ['@playwright/mcp@latest'],
+      args,
       env: {
-        // Playwright configuration via environment variables
-        PLAYWRIGHT_HEADLESS: headless.toString(),
-        PLAYWRIGHT_BROWSER: browser,
-        PLAYWRIGHT_VIEWPORT_WIDTH: viewport.width.toString(),
-        PLAYWRIGHT_VIEWPORT_HEIGHT: viewport.height.toString(),
+        // Keep some fallback environment variables for custom logic
+        PLAYWRIGHT_ENABLE_FALLBACK: enableFallback.toString(),
+        PLAYWRIGHT_RETRY_ATTEMPTS: retryAttempts.toString(),
       },
       timeout,
       trust: true, // Playwright MCP is from Microsoft, generally trusted
@@ -105,7 +137,7 @@ export class PlaywrightMCPIntegration extends BaseMCPIntegration {
   async installForDevelopment(): Promise<void> {
     await this.install({
       headless: false, // Show browser for development
-      browser: 'chromium',
+      browser: 'firefox',
       viewport: { width: 1280, height: 720 },
       timeout: 60000, // Longer timeout for development
     });
@@ -114,7 +146,7 @@ export class PlaywrightMCPIntegration extends BaseMCPIntegration {
   async installForTesting(): Promise<void> {
     await this.install({
       headless: true, // Headless for CI/CD
-      browser: 'chromium',
+      browser: 'firefox',
       viewport: { width: 1920, height: 1080 },
       timeout: 30000,
       includeTools: [
@@ -131,9 +163,11 @@ export class PlaywrightMCPIntegration extends BaseMCPIntegration {
   async installForScraping(): Promise<void> {
     await this.install({
       headless: true, // Always headless for scraping
-      browser: 'chromium',
+      browser: 'firefox',
       viewport: { width: 1280, height: 720 },
       timeout: 45000, // Longer timeout for complex pages
+      enableFallback: true, // Enable fallback to non-headless on anti-scraping detection
+      retryAttempts: 3, // More retries for scraping scenarios
       includeTools: [
         'browser_navigate',
         'browser_evaluate',

@@ -49,3 +49,8 @@ gha-creds-*.json
 
 # Claude Code project instructions
 CLAUDE.md
+
+# Analysis and documentation files
+LOCAL_MODEL_ENHANCEMENT_ANALYSIS.md
+LOCAL_MODEL_FEATURE_ROADMAP.md
+MCP_INTEGRATION_DEMO.md
