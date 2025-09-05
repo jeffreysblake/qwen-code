@@ -474,10 +474,43 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    // Check session token limit after compression and compress more if needed
+    // Prevent context updates from being sent while a tool call is
+    // waiting for a response. The Qwen API requires that a functionResponse
+    // part from the user immediately follows a functionCall part from the model
+    // in the conversation history . The IDE context is not discarded; it will
+    // be included in the next regular message sent to the model.
+    const history = this.getHistory();
+    const lastMessage =
+      history.length > 0 ? history[history.length - 1] : undefined;
+    const hasPendingToolCall =
+      !!lastMessage &&
+      lastMessage.role === 'model' &&
+      (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
+
+    // Add IDE context early so it's included in token calculations
+    let ideContextAdded = false;
+    if (this.config.getIdeMode() && !hasPendingToolCall) {
+      const { contextParts, newIdeContext } = this.getIdeContextParts(
+        this.forceFullIdeContext || history.length === 0,
+      );
+      if (contextParts.length > 0) {
+        this.getChat().addHistory({
+          role: 'user',
+          parts: [{ text: contextParts.join('\n') }],
+        });
+        ideContextAdded = true;
+      }
+      this.lastSentIdeContext = newIdeContext;
+      this.forceFullIdeContext = false;
+    }
+
+    // Check session token limit after compression and IDE context addition
     const sessionTokenLimit = this.config.getSessionTokenLimit();
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    const isLocalModel = authType === 'local';
+    
     if (sessionTokenLimit > 0) {
-      // Get all the content that would be sent in an API call
+      // Get all the content that would be sent in an API call (including IDE context)
       const currentHistory = this.getChat().getHistory(true);
       const userMemory = this.config.getUserMemory();
       const systemPrompt = getCoreSystemPrompt(userMemory);
@@ -502,14 +535,29 @@ export class GeminiClient {
       let totalRequestTokens = initialTokenCount;
 
       if (totalRequestTokens !== undefined) {
-        // If approaching session token limit (90%), try to compress more aggressively
-        const approachingLimit = totalRequestTokens > sessionTokenLimit * 0.9;
+        // For local models, be more aggressive with compression (50% threshold vs 90%)
+        const compressionThreshold = isLocalModel ? 0.5 : 0.9;
+        const approachingLimit = totalRequestTokens > sessionTokenLimit * compressionThreshold;
+        
         if (approachingLimit && !compressed) {
           const additionalCompression = await this.tryCompressChat(prompt_id, true);
           if (additionalCompression) {
             yield { type: GeminiEventType.ChatCompressed, value: additionalCompression };
             
-            // Recalculate tokens after additional compression
+            // Re-add IDE context if it was added before but got lost during compression
+            if (ideContextAdded && this.config.getIdeMode() && !hasPendingToolCall) {
+              const { contextParts } = this.getIdeContextParts(
+                this.forceFullIdeContext || history.length === 0,
+              );
+              if (contextParts.length > 0) {
+                this.getChat().addHistory({
+                  role: 'user',
+                  parts: [{ text: contextParts.join('\n') }],
+                });
+              }
+            }
+            
+            // Recalculate tokens after additional compression (and IDE context re-addition)
             const newHistory = this.getChat().getHistory(true);
             const newMockRequestContent = [
               {
@@ -532,7 +580,49 @@ export class GeminiClient {
           }
         }
 
-        if (totalRequestTokens > sessionTokenLimit) {
+        // For local models, if we still exceed the limit after compression, try one more aggressive compression
+        if (isLocalModel && totalRequestTokens > sessionTokenLimit) {
+          const finalCompression = await this.tryCompressChat(prompt_id, true);
+          if (finalCompression) {
+            yield { type: GeminiEventType.ChatCompressed, value: finalCompression };
+            
+            // Re-add IDE context if it was added before but got lost during compression
+            if (ideContextAdded && this.config.getIdeMode() && !hasPendingToolCall) {
+              const { contextParts } = this.getIdeContextParts(
+                this.forceFullIdeContext || history.length === 0,
+              );
+              if (contextParts.length > 0) {
+                this.getChat().addHistory({
+                  role: 'user',
+                  parts: [{ text: contextParts.join('\n') }],
+                });
+              }
+            }
+            
+            // Recalculate tokens one more time
+            const finalHistory = this.getChat().getHistory(true);
+            const finalMockRequestContent = [
+              {
+                role: 'system' as const,
+                parts: [{ text: systemPrompt }, ...environment],
+              },
+              ...finalHistory,
+            ];
+            
+            const { totalTokens: finalTokenCount } =
+              await this.getContentGenerator().countTokens({
+                model: this.config.getModel(),
+                contents: finalMockRequestContent,
+              });
+            
+            if (finalTokenCount !== undefined) {
+              totalRequestTokens = finalTokenCount;
+            }
+          }
+        }
+
+        // Only hard-fail for non-local models or if compression couldn't help
+        if (totalRequestTokens > sessionTokenLimit && !isLocalModel) {
           yield {
             type: GeminiEventType.SessionTokenLimitExceeded,
             value: {
@@ -545,34 +635,18 @@ export class GeminiClient {
           };
           return new Turn(this.getChat(), prompt_id);
         }
+        
+        // For local models, if we still exceed after all compression attempts, just warn and continue
+        if (totalRequestTokens > sessionTokenLimit && isLocalModel) {
+          yield {
+            type: GeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: totalRequestTokens,
+              newTokenCount: totalRequestTokens, // Same since we couldn't compress further
+            },
+          };
+        }
       }
-    }
-
-    // Prevent context updates from being sent while a tool call is
-    // waiting for a response. The Qwen API requires that a functionResponse
-    // part from the user immediately follows a functionCall part from the model
-    // in the conversation history . The IDE context is not discarded; it will
-    // be included in the next regular message sent to the model.
-    const history = this.getHistory();
-    const lastMessage =
-      history.length > 0 ? history[history.length - 1] : undefined;
-    const hasPendingToolCall =
-      !!lastMessage &&
-      lastMessage.role === 'model' &&
-      (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
-
-    if (this.config.getIdeMode() && !hasPendingToolCall) {
-      const { contextParts, newIdeContext } = this.getIdeContextParts(
-        this.forceFullIdeContext || history.length === 0,
-      );
-      if (contextParts.length > 0) {
-        this.getChat().addHistory({
-          role: 'user',
-          parts: [{ text: contextParts.join('\n') }],
-        });
-      }
-      this.lastSentIdeContext = newIdeContext;
-      this.forceFullIdeContext = false;
     }
 
     const turn = new Turn(this.getChat(), prompt_id);
@@ -840,11 +914,14 @@ export class GeminiClient {
 
     const contextPercentageThreshold =
       this.config.getChatCompression()?.contextPercentageThreshold;
+    const authType = this.config.getContentGeneratorConfig()?.authType;
+    const isLocalModel = authType === 'local';
 
     // Don't compress if not forced and we are under the limit.
     if (!force) {
-      const threshold =
-        contextPercentageThreshold ?? COMPRESSION_TOKEN_THRESHOLD;
+      // For local models, use a lower threshold (0.5 vs 0.7) to compress more aggressively
+      const defaultThreshold = isLocalModel ? 0.5 : COMPRESSION_TOKEN_THRESHOLD;
+      const threshold = contextPercentageThreshold ?? defaultThreshold;
       if (originalTokenCount < threshold * tokenLimit(model)) {
         return null;
       }

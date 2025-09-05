@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { Colors } from '../../colors.js';
@@ -14,6 +14,7 @@ import {
   ToolConfirmationOutcome,
   ToolExecuteConfirmationDetails,
   ToolMcpConfirmationDetails,
+  ToolConfirmationPayload,
   Config,
 } from '@qwen-code/qwen-code-core';
 import {
@@ -22,6 +23,7 @@ import {
 } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
+import { TextInput } from '../shared/TextInput.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -42,8 +44,13 @@ export const ToolConfirmationMessage: React.FC<
 }) => {
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
-  const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
+  const handleConfirm = async (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => {
     if (confirmationDetails.type === 'edit') {
       const ideClient = config?.getIdeClient();
       if (config?.getIdeMode()) {
@@ -55,7 +62,23 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
     }
-    onConfirm(outcome);
+    onConfirm(outcome, payload);
+  };
+
+  const handleRejectWithFeedback = () => {
+    setShowFeedbackInput(true);
+  };
+
+  const handleFeedbackSubmit = (feedbackText: string) => {
+    setShowFeedbackInput(false);
+    handleConfirm(ToolConfirmationOutcome.RejectWithFeedback, {
+      feedback: feedbackText,
+    });
+  };
+
+  const handleFeedbackCancel = () => {
+    setShowFeedbackInput(false);
+    setFeedback('');
   };
 
   useKeypress(
@@ -68,7 +91,13 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused },
   );
 
-  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
+  const handleSelect = (item: ToolConfirmationOutcome) => {
+    if (item === ToolConfirmationOutcome.RejectWithFeedback) {
+      handleRejectWithFeedback();
+    } else {
+      handleConfirm(item);
+    }
+  };
 
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
@@ -265,9 +294,38 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlwaysServer,
       },
       {
-        label: 'No, suggest changes (esc)',
+        label: 'No, tell me what to do differently',
+        value: ToolConfirmationOutcome.RejectWithFeedback,
+      },
+      {
+        label: 'No, cancel (esc)',
         value: ToolConfirmationOutcome.Cancel,
       },
+    );
+  }
+
+  if (showFeedbackInput) {
+    return (
+      <Box flexDirection="column" padding={1} width={childWidth}>
+        {/* Body Content */}
+        <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
+          {bodyContent}
+        </Box>
+
+        {/* Feedback Input */}
+        <Box marginBottom={1} flexShrink={0}>
+          <Text>Please explain what you'd like me to do instead:</Text>
+        </Box>
+        <Box marginBottom={1} flexShrink={0}>
+          <TextInput
+            placeholder="Type your feedback here (Enter to submit, Esc to cancel)"
+            onSubmit={handleFeedbackSubmit}
+            onCancel={handleFeedbackCancel}
+            isFocused={isFocused}
+            maxWidth={childWidth - 4}
+          />
+        </Box>
+      </Box>
     );
   }
 
@@ -289,7 +347,7 @@ export const ToolConfirmationMessage: React.FC<
         <RadioButtonSelect
           items={options}
           onSelect={handleSelect}
-          isFocused={isFocused}
+          isFocused={isFocused && !showFeedbackInput}
         />
       </Box>
     </Box>

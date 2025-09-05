@@ -211,7 +211,7 @@ export class LoopDetectionService {
     }
 
     for (const text of textsToCheck) {
-      const charRepeatPattern = /([^#\-*_=\s\.\,\"\'\(\)])\1{15,}/g; // Increased from 8 to 15
+      const charRepeatPattern = /([^#\-*_=\s.,'"()])\1{15,}/g; // Increased from 8 to 15
       const charMatches = text.match(charRepeatPattern);
       if (charMatches) {
         console.error(`[LOOP DEBUG] Character repetition detected: ${charMatches.join(', ')}`);

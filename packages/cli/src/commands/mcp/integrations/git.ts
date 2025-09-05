@@ -57,13 +57,13 @@ export class GitMCPIntegration extends BaseMCPIntegration {
       console.log('📦 Installing git-mcp-server...');
       await this.installPackage('git-mcp-server');
       console.log('✅ Git MCP server installed successfully');
-    } catch (error) {
+    } catch (_error) {
       // Fallback to npx if global install fails
       console.log('⚠️  Global install failed, will use npx instead');
       try {
         execSync('npx --yes git-mcp-server --help', { stdio: 'pipe', timeout: 30000 });
         console.log('✅ Git MCP server is available via npx');
-      } catch (npxError) {
+      } catch (_npxError) {
         throw new Error('Failed to install or verify Git MCP server availability');
       }
     }

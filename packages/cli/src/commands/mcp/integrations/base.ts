@@ -13,8 +13,8 @@ import * as fs from 'fs';
  * Base class for MCP integration helpers
  */
 export abstract class BaseMCPIntegration {
-  public name: string;
-  public description: string;
+  readonly name: string;
+  readonly description: string;
 
   constructor(name: string, description: string) {
     this.name = name;
@@ -34,7 +34,7 @@ export abstract class BaseMCPIntegration {
   /**
    * Get the MCP server configuration
    */
-  abstract getServerConfig(options?: any): MCPServerConfig;
+  abstract getServerConfig(options?: Record<string, unknown>): MCPServerConfig;
 
   /**
    * Validate the server configuration
@@ -44,7 +44,7 @@ export abstract class BaseMCPIntegration {
   /**
    * Install and configure the MCP server
    */
-  async install(options?: any): Promise<void> {
+  async install(options?: Record<string, unknown>): Promise<void> {
     console.log(`🔌 Installing ${this.name} MCP integration...`);
 
     // Check dependencies

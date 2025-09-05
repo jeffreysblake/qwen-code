@@ -75,28 +75,31 @@ async function handleIntegration(options: IntegrateOptions) {
       process.exit(1);
     }
 
-    console.log(`📦 ${integrationInfo.name}`);
-    console.log(`📖 ${integrationInfo.description}\n`);
+    console.log(`📦 ${integrationInfo['name']}`);
+    console.log(`📖 ${integrationInfo['description']}\n`);
 
-    if (integrationInfo.tools) {
+    if (integrationInfo['tools']) {
       console.log('🛠️  Available Tools:');
-      integrationInfo.tools.forEach((tool: string) => {
+      const tools = integrationInfo['tools'] as string[];
+      tools.forEach((tool: string) => {
         console.log(`   • ${tool}`);
       });
       console.log('');
     }
 
-    if (integrationInfo.examples) {
+    if (integrationInfo['examples']) {
       console.log('💡 Usage Examples:');
-      Object.entries(integrationInfo.examples).forEach(([task, example]) => {
+      const examples = integrationInfo['examples'] as Record<string, string>;
+      Object.entries(examples).forEach(([task, example]) => {
         console.log(`   ${task}: "${example}"`);
       });
       console.log('');
     }
 
-    if (integrationInfo.security) {
+    if (integrationInfo['security']) {
       console.log('🔒 Security Recommendations:');
-      integrationInfo.security.forEach((rec: string) => {
+      const security = integrationInfo['security'] as string[];
+      security.forEach((rec: string) => {
         console.log(`   ${rec}`);
       });
       console.log('');
@@ -136,7 +139,7 @@ async function handleIntegration(options: IntegrateOptions) {
       await installFileSystemIntegration(integration, options);
     } else {
       // Generic installation
-      await installIntegration(name, options);
+      await installIntegration(name, options as unknown as Record<string, unknown>);
     }
 
     console.log(`\n✅ Successfully installed ${name} MCP integration!`);
@@ -202,19 +205,19 @@ async function installDatabaseIntegration(
     readOnly 
   } = options;
 
-  const dbOptions: any = {
+  const dbOptions: Record<string, unknown> = {
     databaseType: type || 'sqlite',
     readOnly: readOnly ?? true,
   };
 
   if (connectionString) {
-    dbOptions.connectionString = connectionString;
+    dbOptions['connectionString'] = connectionString;
   } else if (database) {
-    dbOptions.database = database;
-    dbOptions.host = host || 'localhost';
-    if (port) dbOptions.port = port;
-    if (username) dbOptions.username = username;
-    if (password) dbOptions.password = password;
+    dbOptions['database'] = database;
+    dbOptions['host'] = host || 'localhost';
+    if (port) dbOptions['port'] = port;
+    if (username) dbOptions['username'] = username;
+    if (password) dbOptions['password'] = password;
   }
 
   await integration.install(dbOptions);
@@ -238,8 +241,7 @@ async function installFileSystemIntegration(
 export const integrateCommand: CommandModule = {
   command: 'integrate [name]',
   describe: 'Install and manage pre-configured MCP integrations',
-  builder: (yargs) => {
-    return yargs
+  builder: (yargs) => yargs
       .positional('name', {
         describe: 'Name of the integration to install',
         type: 'string',
@@ -332,7 +334,6 @@ export const integrateCommand: CommandModule = {
         ['$0 mcp integrate git-advanced --read-only', 'Install Git integration in read-only mode'],
         ['$0 mcp integrate database-sqlite --type=sqlite', 'Install SQLite database integration'],
         ['$0 mcp integrate filesystem --directories=./src,./docs', 'Install File System with specific directories'],
-      ]);
-  },
-  handler: (args: any) => handleIntegration(args as IntegrateOptions),
+      ]),
+  handler: (args: Record<string, unknown>) => handleIntegration(args as unknown as IntegrateOptions),
 };

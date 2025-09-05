@@ -26,6 +26,7 @@ export function getDecisionFromOutcome(
     case ToolConfirmationOutcome.ModifyWithEditor:
       return ToolCallDecision.MODIFY;
     case ToolConfirmationOutcome.Cancel:
+    case ToolConfirmationOutcome.RejectWithFeedback:
     default:
       return ToolCallDecision.REJECT;
   }

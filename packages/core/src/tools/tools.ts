@@ -268,17 +268,24 @@ export abstract class DeclarativeTool<
  * the final `ToolInvocation` object instantiation.
  */
 /**
- * Normalizes parameter values that may have been converted to Python-style strings.
- * Specifically handles boolean conversion from "True"/"False" strings back to booleans.
+ * Normalizes parameter values that may have been converted to string representations of booleans.
+ * Handles boolean conversion from any case variant of "true"/"false" strings back to booleans.
+ * Also handles nested objects recursively.
  */
 function normalizeParams<T extends object>(params: T): T {
   const normalized = { ...params };
   
   for (const [key, value] of Object.entries(normalized)) {
-    if (value === 'True') {
-      (normalized as any)[key] = true;
-    } else if (value === 'False') {
-      (normalized as any)[key] = false;
+    if (typeof value === 'string') {
+      const lowerValue = value.toLowerCase().trim();
+      if (lowerValue === 'true') {
+        (normalized as Record<string, unknown>)[key] = true;
+      } else if (lowerValue === 'false') {
+        (normalized as Record<string, unknown>)[key] = false;
+      }
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      // Recursively normalize nested objects
+      (normalized as Record<string, unknown>)[key] = normalizeParams(value as object);
     }
   }
   
@@ -485,13 +492,18 @@ export interface ToolEditConfirmationDetails {
 export interface ToolConfirmationPayload {
   // used to override `modifiedProposedContent` for modifiable tools in the
   // inline modify flow
-  newContent: string;
+  newContent?: string;
+  // feedback provided when rejecting a tool call with suggestions
+  feedback?: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   command: string;
   rootCommand: string;
 }
@@ -502,13 +514,19 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
 }
 
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
-  onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
   prompt: string;
   urls?: string[];
 }
@@ -526,6 +544,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
+  RejectWithFeedback = 'reject_with_feedback',
 }
 
 export enum Kind {

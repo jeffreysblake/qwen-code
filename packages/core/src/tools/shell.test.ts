@@ -106,6 +106,30 @@ describe('ShellTool', () => {
       });
       expect(invocation).toBeDefined();
     });
+    
+    it('should normalize string boolean values', () => {
+      // Test various string representations of booleans
+      // TypeScript casting is needed here since we're testing runtime behavior
+      expect(() => shellTool.build({
+        command: 'ls -l',
+        is_background: 'false' as unknown as boolean,
+      })).not.toThrow();
+      
+      expect(() => shellTool.build({
+        command: 'ls -l',
+        is_background: 'False' as unknown as boolean,
+      })).not.toThrow();
+      
+      expect(() => shellTool.build({
+        command: 'ls -l',
+        is_background: 'TRUE' as unknown as boolean,
+      })).not.toThrow();
+      
+      expect(() => shellTool.build({
+        command: 'ls -l',
+        is_background: 'True' as unknown as boolean,
+      })).not.toThrow();
+    });
 
     it('should throw an error for an empty command', () => {
       expect(() =>
@@ -800,6 +824,68 @@ describe('ShellTool', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
+    });
+  });
+
+  describe('boolean parameter normalization', () => {
+    it('should normalize string "False" to boolean false', () => {
+      const params = {
+        command: 'ls',
+        is_background: 'False',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(false);
+    });
+
+    it('should normalize string "True" to boolean true', () => {
+      const params = {
+        command: 'ls',
+        is_background: 'True',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(true);
+    });
+
+    it('should normalize lowercase string "false" to boolean false', () => {
+      const params = {
+        command: 'ls',
+        is_background: 'false',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(false);
+    });
+
+    it('should normalize lowercase string "true" to boolean true', () => {
+      const params = {
+        command: 'ls',
+        is_background: 'true',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(true);
+    });
+
+    it('should normalize string "False" with whitespace to boolean false', () => {
+      const params = {
+        command: 'ls',
+        is_background: '  False  ',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(false);
+    });
+
+    it('should normalize mixed case string "TRUE" to boolean true', () => {
+      const params = {
+        command: 'ls',
+        is_background: 'TRUE',
+      };
+      // @ts-expect-error - We're testing runtime conversion
+      const invocation = shellTool.build(params);
+      expect(invocation.params.is_background).toBe(true);
     });
   });
 });

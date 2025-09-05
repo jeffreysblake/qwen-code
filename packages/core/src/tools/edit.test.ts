@@ -331,7 +331,7 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (filePath_arg, content, p, client, abortSignal) => {
+        async (filePath_arg, content, p, client, _abortSignal) => {
           mockCalled = true;
           expect(filePath_arg).toBe(filePath);
           expect(content).toBe(originalContent);

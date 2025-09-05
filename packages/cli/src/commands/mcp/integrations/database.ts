@@ -68,6 +68,8 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           console.warn('⚠️  MySQL client not found. MCP server will still work, but some features may be limited.');
         }
         break;
+      default:
+        throw new Error(`Unsupported database type: ${this.databaseType}`);
     }
 
     return true;
@@ -119,13 +121,16 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
             console.log('✅ MCP Alchemy available via uvx');
           }
           break;
+        default:
+          throw new Error(`Unsupported database type: ${this.databaseType}`);
       }
     } catch (error) {
       throw new Error(`Failed to install ${this.databaseType} MCP server: ${error}`);
     }
   }
 
-  getServerConfig(options: DatabaseIntegrationOptions): MCPServerConfig {
+  getServerConfig(options?: Record<string, unknown>): MCPServerConfig {
+    const dbOptions = (options as unknown as DatabaseIntegrationOptions) || { databaseType: this.databaseType as 'sqlite' | 'postgresql' | 'mysql' | 'multi' };
     const {
       connectionString,
       databasePath,
@@ -138,11 +143,11 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
       timeout = 30000,
       includeTools,
       excludeTools,
-    } = options;
+    } = dbOptions;
 
     let command: string;
     let args: string[];
-    let env: Record<string, string> = {};
+    const env: Record<string, string> = {};
 
     switch (this.databaseType) {
       case 'sqlite':
@@ -243,6 +248,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           return false;
         }
         break;
+      default:
+        console.error(`❌ Unsupported database type: ${this.databaseType}`);
+        return false;
     }
 
     return true;
@@ -417,9 +425,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           'Migrate data': 'Migrate data from MySQL to PostgreSQL',
           'Sync databases': 'Synchronize data between two database instances',
         };
+      default:
+        return examples;
     }
-
-    return examples;
   }
 
   /**

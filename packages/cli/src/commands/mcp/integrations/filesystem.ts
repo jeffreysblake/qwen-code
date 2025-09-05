@@ -115,7 +115,7 @@ export class FileSystemMCPIntegration extends BaseMCPIntegration {
     });
 
     // Choose the best available server implementation
-    let command = 'npx';
+    const command = 'npx';
     let args: string[] = [];
     
     // Try to detect which server is available

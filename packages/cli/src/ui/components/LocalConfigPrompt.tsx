@@ -197,7 +197,7 @@ export function LocalConfigPrompt({
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.Gray}>
-          Note: API Key can be any value for local models (e.g., "lm-studio")
+          Note: API Key can be any value for local models (e.g., &quot;lm-studio&quot;)
         </Text>
       </Box>
     </Box>

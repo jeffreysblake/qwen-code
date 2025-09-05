@@ -52,7 +52,7 @@ export function getIntegrationNames(): string[] {
 /**
  * Install an integration with guided setup
  */
-export async function installIntegration(name: string, options: any = {}): Promise<void> {
+export async function installIntegration(name: string, options: Record<string, unknown> = {}): Promise<void> {
   const integration = getIntegration(name);
   if (!integration) {
     throw new Error(`Unknown integration: ${name}`);
@@ -86,32 +86,36 @@ export function listIntegrations(): Array<{ name: string; description: string }>
 /**
  * Get integration info including available tools and examples
  */
-export function getIntegrationInfo(name: string): any {
+export function getIntegrationInfo(name: string): Record<string, unknown> | null {
   const integration = getIntegration(name);
   if (!integration) {
     return null;
   }
 
-  const info: any = {
+  const info: Record<string, unknown> = {
     name: integration.name,
     description: integration.description,
   };
 
   // Add specific methods if they exist
   if ('getAvailableTools' in integration) {
-    info.tools = (integration as any).getAvailableTools();
+    const method = (integration as Record<string, unknown>)['getAvailableTools'] as () => unknown;
+    info['tools'] = method();
   }
 
   if ('getUsageExamples' in integration) {
-    info.examples = (integration as any).getUsageExamples();
+    const method = (integration as Record<string, unknown>)['getUsageExamples'] as () => unknown;
+    info['examples'] = method();
   }
 
   if ('getSecurityBestPractices' in integration) {
-    info.security = (integration as any).getSecurityBestPractices();
+    const method = (integration as Record<string, unknown>)['getSecurityBestPractices'] as () => unknown;
+    info['security'] = method();
   }
 
   if ('getSecurityRecommendations' in integration) {
-    info.security = (integration as any).getSecurityRecommendations();
+    const method = (integration as Record<string, unknown>)['getSecurityRecommendations'] as () => unknown;
+    info['security'] = method();
   }
 
   return info;
