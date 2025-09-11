@@ -422,6 +422,7 @@ class Session {
 
         switch (outcome) {
           case ToolConfirmationOutcome.Cancel:
+          case ToolConfirmationOutcome.RejectWithFeedback:
             return errorResponse(
               new Error(`Tool "${fc.name}" was canceled by the user.`),
             );

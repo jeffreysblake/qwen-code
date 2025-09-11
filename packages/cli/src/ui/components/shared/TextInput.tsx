@@ -46,7 +46,8 @@ export const TextInput: React.FC<TextInputProps> = ({
 
       if (key.name === 'backspace') {
         if (cursorPos > 0) {
-          const newValue = value.slice(0, cursorPos - 1) + value.slice(cursorPos);
+          const newValue =
+            value.slice(0, cursorPos - 1) + value.slice(cursorPos);
           setValue(newValue);
           setCursorPos(cursorPos - 1);
         }
@@ -82,7 +83,8 @@ export const TextInput: React.FC<TextInputProps> = ({
 
       // Regular character input
       if (key.name && key.name.length === 1 && !key.ctrl && !key.meta) {
-        const newValue = value.slice(0, cursorPos) + key.name + value.slice(cursorPos);
+        const newValue =
+          value.slice(0, cursorPos) + key.name + value.slice(cursorPos);
         if (newValue.length <= maxWidth) {
           setValue(newValue);
           setCursorPos(cursorPos + 1);
@@ -92,7 +94,8 @@ export const TextInput: React.FC<TextInputProps> = ({
 
       // Handle printable characters
       if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
-        const newValue = value.slice(0, cursorPos) + key.sequence + value.slice(cursorPos);
+        const newValue =
+          value.slice(0, cursorPos) + key.sequence + value.slice(cursorPos);
         if (newValue.length <= maxWidth) {
           setValue(newValue);
           setCursorPos(cursorPos + 1);
@@ -102,7 +105,7 @@ export const TextInput: React.FC<TextInputProps> = ({
     { isActive: isFocused },
   );
 
-  const displayValue = value.length === 0 && placeholder ? placeholder : value;
+  // const displayValue = value.length === 0 && placeholder ? placeholder : value;
   const isPlaceholder = value.length === 0 && placeholder;
 
   return (
@@ -115,7 +118,9 @@ export const TextInput: React.FC<TextInputProps> = ({
           {isFocused && (
             <Text>
               {chalk.inverse(
-                cursorPos < value.length ? value.slice(cursorPos, cursorPos + 1) : ' '
+                cursorPos < value.length
+                  ? value.slice(cursorPos, cursorPos + 1)
+                  : ' ',
               )}
             </Text>
           )}

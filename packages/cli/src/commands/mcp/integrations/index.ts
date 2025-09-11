@@ -52,7 +52,10 @@ export function getIntegrationNames(): string[] {
 /**
  * Install an integration with guided setup
  */
-export async function installIntegration(name: string, options: Record<string, unknown> = {}): Promise<void> {
+export async function installIntegration(
+  name: string,
+  options: Record<string, unknown> = {},
+): Promise<void> {
   const integration = getIntegration(name);
   if (!integration) {
     throw new Error(`Unknown integration: ${name}`);
@@ -76,8 +79,11 @@ export async function uninstallIntegration(name: string): Promise<void> {
 /**
  * List all available integrations with descriptions
  */
-export function listIntegrations(): Array<{ name: string; description: string }> {
-  return getAvailableIntegrations().map(integration => ({
+export function listIntegrations(): Array<{
+  name: string;
+  description: string;
+}> {
+  return getAvailableIntegrations().map((integration) => ({
     name: integration.name,
     description: integration.description,
   }));
@@ -86,7 +92,9 @@ export function listIntegrations(): Array<{ name: string; description: string }>
 /**
  * Get integration info including available tools and examples
  */
-export function getIntegrationInfo(name: string): Record<string, unknown> | null {
+export function getIntegrationInfo(
+  name: string,
+): Record<string, unknown> | null {
   const integration = getIntegration(name);
   if (!integration) {
     return null;
@@ -99,22 +107,30 @@ export function getIntegrationInfo(name: string): Record<string, unknown> | null
 
   // Add specific methods if they exist
   if ('getAvailableTools' in integration) {
-    const method = (integration as Record<string, unknown>)['getAvailableTools'] as () => unknown;
+    const method = (integration as Record<string, unknown>)[
+      'getAvailableTools'
+    ] as () => unknown;
     info['tools'] = method();
   }
 
   if ('getUsageExamples' in integration) {
-    const method = (integration as Record<string, unknown>)['getUsageExamples'] as () => unknown;
+    const method = (integration as Record<string, unknown>)[
+      'getUsageExamples'
+    ] as () => unknown;
     info['examples'] = method();
   }
 
   if ('getSecurityBestPractices' in integration) {
-    const method = (integration as Record<string, unknown>)['getSecurityBestPractices'] as () => unknown;
+    const method = (integration as Record<string, unknown>)[
+      'getSecurityBestPractices'
+    ] as () => unknown;
     info['security'] = method();
   }
 
   if ('getSecurityRecommendations' in integration) {
-    const method = (integration as Record<string, unknown>)['getSecurityRecommendations'] as () => unknown;
+    const method = (integration as Record<string, unknown>)[
+      'getSecurityRecommendations'
+    ] as () => unknown;
     info['security'] = method();
   }
 

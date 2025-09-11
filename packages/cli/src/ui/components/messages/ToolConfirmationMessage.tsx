@@ -45,7 +45,7 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
-  const [feedback, setFeedback] = useState('');
+  // const [feedback, setFeedback] = useState('');
 
   const handleConfirm = async (
     outcome: ToolConfirmationOutcome,
@@ -78,7 +78,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleFeedbackCancel = () => {
     setShowFeedbackInput(false);
-    setFeedback('');
+    // setFeedback('');
   };
 
   useKeypress(

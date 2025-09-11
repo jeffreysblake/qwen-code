@@ -66,10 +66,10 @@ export abstract class BaseMCPIntegration {
     // Add to settings
     const settings = loadSettings(process.cwd());
     const settingsScope = SettingScope.Workspace;
-    
+
     const existingSettings = settings.forScope(settingsScope).settings;
     const mcpServers = existingSettings.mcpServers || {};
-    
+
     mcpServers[this.name] = config;
     settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
@@ -85,10 +85,10 @@ export abstract class BaseMCPIntegration {
 
     const settings = loadSettings(process.cwd());
     const settingsScope = SettingScope.Workspace;
-    
+
     const existingSettings = settings.forScope(settingsScope).settings;
     const mcpServers = existingSettings.mcpServers || {};
-    
+
     if (mcpServers[this.name]) {
       delete mcpServers[this.name];
       settings.setValue(settingsScope, 'mcpServers', mcpServers);

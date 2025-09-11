@@ -50,6 +50,7 @@ export enum AuthType {
   USE_OPENAI = 'openai',
   QWEN_OAUTH = 'qwen-oauth',
   LOCAL = 'local',
+  API_KEY = 'api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -212,7 +213,10 @@ export async function createContentGenerator(
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
 
-  if (config.authType === AuthType.USE_OPENAI || config.authType === AuthType.LOCAL) {
+  if (
+    config.authType === AuthType.USE_OPENAI ||
+    config.authType === AuthType.LOCAL
+  ) {
     if (!config.apiKey) {
       throw new Error('API key is required for OpenAI/Local authentication');
     }

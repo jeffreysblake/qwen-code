@@ -25,20 +25,24 @@ export class GitMCPIntegration extends BaseMCPIntegration {
   constructor() {
     super(
       'git-advanced',
-      'Advanced Git operations including merge, rebase, conflict resolution, and repository management. Provides AI-powered assistance for complex Git workflows.'
+      'Advanced Git operations including merge, rebase, conflict resolution, and repository management. Provides AI-powered assistance for complex Git workflows.',
     );
   }
 
   async checkDependencies(): Promise<boolean> {
     // Check if Node.js version is compatible (>=20.0.0 for the cyanheads implementation)
     if (!this.checkNodeVersion('20.0.0')) {
-      console.error('❌ Node.js version 20.0.0 or higher is required for Git MCP');
+      console.error(
+        '❌ Node.js version 20.0.0 or higher is required for Git MCP',
+      );
       return false;
     }
 
     // Check if Git is installed
     if (!this.commandExists('git')) {
-      console.error('❌ Git is required but not found. Please install Git first.');
+      console.error(
+        '❌ Git is required but not found. Please install Git first.',
+      );
       return false;
     }
 
@@ -61,10 +65,15 @@ export class GitMCPIntegration extends BaseMCPIntegration {
       // Fallback to npx if global install fails
       console.log('⚠️  Global install failed, will use npx instead');
       try {
-        execSync('npx --yes git-mcp-server --help', { stdio: 'pipe', timeout: 30000 });
+        execSync('npx --yes git-mcp-server --help', {
+          stdio: 'pipe',
+          timeout: 30000,
+        });
         console.log('✅ Git MCP server is available via npx');
       } catch (_npxError) {
-        throw new Error('Failed to install or verify Git MCP server availability');
+        throw new Error(
+          'Failed to install or verify Git MCP server availability',
+        );
       }
     }
   }
@@ -92,8 +101,10 @@ export class GitMCPIntegration extends BaseMCPIntegration {
         GIT_MCP_ALLOW_WRITE: allowWrite.toString(),
         GIT_MCP_ALLOW_DANGEROUS: allowDangerousOperations.toString(),
         // Set Git configuration for better MCP integration
-        GIT_CONFIG_GLOBAL_USER_NAME: this.getGitConfig('user.name') || 'Qwen Code AI',
-        GIT_CONFIG_GLOBAL_USER_EMAIL: this.getGitConfig('user.email') || 'ai@qwencode.local',
+        GIT_CONFIG_GLOBAL_USER_NAME:
+          this.getGitConfig('user.name') || 'Qwen Code AI',
+        GIT_CONFIG_GLOBAL_USER_EMAIL:
+          this.getGitConfig('user.email') || 'ai@qwencode.local',
       },
       timeout,
       trust: true,
@@ -110,7 +121,8 @@ export class GitMCPIntegration extends BaseMCPIntegration {
     }
 
     // Validate that the repository path exists and is a git repository
-    const repoPath = config.env?.['GIT_MCP_REPOSITORY_PATH'] || this.getWorkspaceRoot();
+    const repoPath =
+      config.env?.['GIT_MCP_REPOSITORY_PATH'] || this.getWorkspaceRoot();
     if (!this.isGitRepository(repoPath)) {
       console.error(`❌ ${repoPath} is not a Git repository`);
       return false;
@@ -190,7 +202,9 @@ export class GitMCPIntegration extends BaseMCPIntegration {
    */
   private getGitConfig(key: string): string | null {
     try {
-      return execSync(`git config --global ${key}`, { encoding: 'utf8' }).trim();
+      return execSync(`git config --global ${key}`, {
+        encoding: 'utf8',
+      }).trim();
     } catch {
       return null;
     }
@@ -220,20 +234,20 @@ export class GitMCPIntegration extends BaseMCPIntegration {
       'git_remote_list',
       'git_remote_add',
       'git_remote_remove',
-      
+
       // File operations
       'git_add',
       'git_rm',
       'git_mv',
       'git_checkout_file',
-      
+
       // Commit operations
       'git_commit',
       'git_commit_amend',
       'git_show',
       'git_log',
       'git_diff',
-      
+
       // Branch operations
       'git_branch_list',
       'git_branch_create',
@@ -241,25 +255,25 @@ export class GitMCPIntegration extends BaseMCPIntegration {
       'git_branch_rename',
       'git_checkout',
       'git_switch',
-      
+
       // Merge and rebase
       'git_merge',
       'git_merge_abort',
       'git_rebase',
       'git_rebase_abort',
       'git_cherry_pick',
-      
+
       // Remote operations
       'git_fetch',
       'git_pull',
       'git_push',
-      
+
       // Stash operations
       'git_stash_list',
       'git_stash_save',
       'git_stash_pop',
       'git_stash_drop',
-      
+
       // Advanced operations
       'git_reset',
       'git_revert',
@@ -267,12 +281,12 @@ export class GitMCPIntegration extends BaseMCPIntegration {
       'git_tag_list',
       'git_tag_create',
       'git_tag_delete',
-      
+
       // Worktree operations
       'git_worktree_list',
       'git_worktree_add',
       'git_worktree_remove',
-      
+
       // Submodule operations
       'git_submodule_list',
       'git_submodule_add',
@@ -285,15 +299,19 @@ export class GitMCPIntegration extends BaseMCPIntegration {
    */
   getUsageExamples(): Record<string, string> {
     return {
-      'Check repository status': 'Show the current status of the Git repository',
+      'Check repository status':
+        'Show the current status of the Git repository',
       'Create a new branch': 'Create a new branch called "feature/new-feature"',
       'Merge branches': 'Merge the "feature/new-feature" branch into main',
-      'Resolve merge conflicts': 'Help me resolve the merge conflicts in src/app.js',
-      'Rebase interactive': 'Start an interactive rebase for the last 3 commits',
+      'Resolve merge conflicts':
+        'Help me resolve the merge conflicts in src/app.js',
+      'Rebase interactive':
+        'Start an interactive rebase for the last 3 commits',
       'Cherry-pick commit': 'Cherry-pick commit abc123 from main branch',
       'View commit history': 'Show the last 10 commits with their changes',
       'Push changes': 'Push the current branch to origin',
-      'Create and switch branch': 'Create a new branch "hotfix/bug-123" and switch to it',
+      'Create and switch branch':
+        'Create a new branch "hotfix/bug-123" and switch to it',
       'Stash changes': 'Stash the current uncommitted changes',
     };
   }
@@ -303,12 +321,12 @@ export class GitMCPIntegration extends BaseMCPIntegration {
    */
   getConflictResolutionStrategies(): Record<string, string> {
     return {
-      'ours': 'Keep changes from the current branch (ours)',
-      'theirs': 'Keep changes from the incoming branch (theirs)',
-      'union': 'Keep changes from both branches',
-      'patience': 'Use patience algorithm for complex merges',
-      'histogram': 'Use histogram algorithm for better merge results',
-      'minimal': 'Minimize the size of the diff',
+      ours: 'Keep changes from the current branch (ours)',
+      theirs: 'Keep changes from the incoming branch (theirs)',
+      union: 'Keep changes from both branches',
+      patience: 'Use patience algorithm for complex merges',
+      histogram: 'Use histogram algorithm for better merge results',
+      minimal: 'Minimize the size of the diff',
     };
   }
 }

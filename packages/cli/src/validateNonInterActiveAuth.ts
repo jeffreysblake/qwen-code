@@ -19,10 +19,20 @@ function getAuthTypeFromEnv(): AuthType | undefined {
     return AuthType.USE_GEMINI;
   }
   // Check if this looks like a local configuration (all three required vars present)
-  if (process.env['OPENAI_API_KEY'] && process.env['OPENAI_BASE_URL'] && process.env['OPENAI_MODEL']) {
+  if (
+    process.env['OPENAI_API_KEY'] &&
+    process.env['OPENAI_BASE_URL'] &&
+    process.env['OPENAI_MODEL']
+  ) {
     // If the base URL looks like a local endpoint, use LOCAL auth type
     const baseUrl = process.env['OPENAI_BASE_URL'].toLowerCase();
-    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') || baseUrl.includes('192.168.') || baseUrl.includes('10.') || baseUrl.includes('172.')) {
+    if (
+      baseUrl.includes('localhost') ||
+      baseUrl.includes('127.0.0.1') ||
+      baseUrl.includes('192.168.') ||
+      baseUrl.includes('10.') ||
+      baseUrl.includes('172.')
+    ) {
       return AuthType.LOCAL;
     }
     // Otherwise use standard OpenAI
@@ -40,11 +50,11 @@ export async function validateNonInteractiveAuth(
   nonInteractiveConfig: Config,
 ) {
   const envAuthType = getAuthTypeFromEnv();
-  
+
   // If environment variables provide a complete auth setup, prioritize that
   // This prevents auth screen loops when env vars are set but settings have a different auth type
   let effectiveAuthType = configuredAuthType;
-  
+
   if (envAuthType) {
     // If env variables suggest LOCAL or another auth type, and it validates successfully, use it
     const envValidationError = validateAuthMethod(envAuthType);
@@ -55,7 +65,7 @@ export async function validateNonInteractiveAuth(
       effectiveAuthType = envAuthType;
     }
   }
-  
+
   if (!effectiveAuthType) {
     console.error(
       `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, OPENAI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`,

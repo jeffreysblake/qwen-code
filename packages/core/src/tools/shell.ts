@@ -345,23 +345,26 @@ function getShellToolDescription(): string {
   const toolDescription = `
     ${platform === 'win32' ? 'This tool executes a given shell command as `cmd.exe /c <command>`.' : 'This tool executes a given shell command as `bash -c <command>`. '}
 
-      **Background vs Foreground Execution:**
-      You should decide whether commands should run in background or foreground based on their nature:
-      
-      **Use background execution (is_background: true) for:**
-      - Long-running development servers: \`npm run start\`, \`npm run dev\`, \`yarn dev\`, \`bun run start\`
-      - Build watchers: \`npm run watch\`, \`webpack --watch\`
-      - Database servers: \`mongod\`, \`mysql\`, \`redis-server\`
-      - Web servers: \`python -m http.server\`, \`php -S localhost:8000\`
-      - Any command expected to run indefinitely until manually stopped
-      
-      **Use foreground execution (is_background: false) for:**
-      - One-time commands: \`ls\`, \`cat\`, \`grep\`
-      - Build commands: \`npm run build\`, \`make\`
-      - Installation commands: \`npm install\`, \`pip install\`
-      - Git operations: \`git commit\`, \`git push\`
-      - Test runs: \`npm test\`, \`pytest\`
-      
+      **CRITICAL: Background vs Foreground Execution Decision:**
+      You MUST correctly choose between background and foreground execution based on command behavior:
+
+      **ALWAYS use background execution (is_background: true) for:**
+      - Development servers: \`npm run start\`, \`npm run dev\`, \`yarn dev\`, \`bun run start\`, \`python manage.py runserver\`
+      - Build watchers: \`npm run watch\`, \`webpack --watch\`, \`tsc --watch\`, \`rollup --watch\`
+      - Database servers: \`mongod\`, \`mysql\`, \`redis-server\`, \`postgres\`
+      - Web/application servers: \`python -m http.server\`, \`php -S localhost:8000\`, \`ruby -run -httpd\`
+      - File watchers/monitors: \`nodemon\`, \`watchman\`, \`fswatch\`
+      - Any command that runs continuously until manually interrupted (Ctrl+C)
+
+      **ALWAYS use foreground execution (is_background: false) for:**
+      - File operations: \`ls\`, \`cat\`, \`grep\`, \`find\`, \`cp\`, \`mv\`, \`rm\`, \`mkdir\`
+      - Build/compile commands: \`npm run build\`, \`make\`, \`cargo build\`, \`go build\`, \`tsc\`
+      - Package management: \`npm install\`, \`pip install\`, \`yarn add\`, \`cargo add\`
+      - Git operations: \`git commit\`, \`git push\`, \`git pull\`, \`git status\`, \`git log\`
+      - Test execution: \`npm test\`, \`pytest\`, \`cargo test\`, \`go test\`, \`jest\`
+      - Utility commands: \`curl\`, \`wget\`, \`echo\`, \`which\`, \`pwd\`, \`whoami\`
+      - Any command that completes a task and exits naturally
+
       ${platform === 'win32' ? '' : 'Command is executed as a subprocess that leads its own process group. Command process group can be terminated as `kill -- -PGID` or signaled as `kill -s SIGNAL -- -PGID`.'}
 
       The following information is returned:
@@ -410,7 +413,7 @@ export class ShellTool extends BaseDeclarativeTool<
           is_background: {
             type: 'boolean',
             description:
-              'Whether to run the command in background. Default is false. Set to true for long-running processes like development servers, watchers, or daemons that should continue running without blocking further commands.',
+              'Whether to run the command in background. Default is false. REQUIRED: Set to true for long-running processes like development servers (npm start, npm run dev), watchers (npm run watch), database servers (mongod, redis-server), web servers (python -m http.server), or any command expected to run indefinitely. Set to false for one-time commands like builds (npm run build), installs (npm install), git operations (git commit), tests (npm test), file operations (ls, cat, grep), and other commands that complete and exit.',
           },
           description: {
             type: 'string',

@@ -15,11 +15,13 @@ export const ContextUsageDisplay = ({
   promptTokenCount: number;
   model: string;
 }) => {
-  const percentage = promptTokenCount / tokenLimit(model);
+  const limit = tokenLimit(model);
+  const percentage = Math.min(promptTokenCount / limit, 1); // Cap percentage at 1 to prevent negative context
+  const contextLeft = Math.max(0, ((1 - percentage) * 100)); // Ensure non-negative percentage
 
   return (
     <Text color={Colors.Gray}>
-      ({((1 - percentage) * 100).toFixed(0)}% context left)
+      ({contextLeft.toFixed(0)}% context left)
     </Text>
   );
 };

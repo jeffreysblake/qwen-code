@@ -254,18 +254,18 @@ describe('validateNonInterActiveAuth', () => {
     process.env['OPENAI_API_KEY'] = 'lm-studio';
     process.env['OPENAI_BASE_URL'] = 'http://localhost:1234/v1';
     process.env['OPENAI_MODEL'] = 'test-model';
-    
+
     const nonInteractiveConfig: NonInteractiveConfig = {
       refreshAuth: refreshAuthMock,
     };
-    
+
     // Pass a different configured auth type but env should take precedence
     await validateNonInteractiveAuth(
       AuthType.QWEN_OAUTH,
       undefined,
       nonInteractiveConfig,
     );
-    
+
     expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOCAL);
   });
 

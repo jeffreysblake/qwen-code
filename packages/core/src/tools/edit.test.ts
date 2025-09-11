@@ -381,19 +381,21 @@ describe('EditTool', () => {
     beforeEach(() => {
       filePath = path.join(rootDir, testFile);
       // Default for execute tests, can be overridden
-      mockEnsureCorrectEdit.mockImplementation(async (filePath, content, params) => {
-        let occurrences = 0;
-        if (params.old_string && content) {
-          let index = content.indexOf(params.old_string);
-          while (index !== -1) {
-            occurrences++;
-            index = content.indexOf(params.old_string, index + 1);
+      mockEnsureCorrectEdit.mockImplementation(
+        async (filePath, content, params) => {
+          let occurrences = 0;
+          if (params.old_string && content) {
+            let index = content.indexOf(params.old_string);
+            while (index !== -1) {
+              occurrences++;
+              index = content.indexOf(params.old_string, index + 1);
+            }
+          } else if (params.old_string === '') {
+            occurrences = 0;
           }
-        } else if (params.old_string === '') {
-          occurrences = 0;
-        }
-        return { params, occurrences };
-      });
+          return { params, occurrences };
+        },
+      );
     });
 
     it('should throw error if file path is not absolute', async () => {

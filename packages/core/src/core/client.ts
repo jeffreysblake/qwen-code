@@ -28,6 +28,7 @@ import { Config } from '../config/config.js';
 import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
+import { getCompressionThreshold } from '../utils/localModelUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
@@ -440,6 +441,13 @@ export class GeminiClient {
     }
   }
 
+  /**
+   * Gets adaptive compression threshold based on system resources and model type
+   */
+  private getAdaptiveCompressionThreshold(isLocal: boolean): number {
+    return getCompressionThreshold(isLocal);
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -508,7 +516,7 @@ export class GeminiClient {
     const sessionTokenLimit = this.config.getSessionTokenLimit();
     const authType = this.config.getContentGeneratorConfig()?.authType;
     const isLocalModel = authType === 'local';
-    
+
     if (sessionTokenLimit > 0) {
       // Get all the content that would be sent in an API call (including IDE context)
       const currentHistory = this.getChat().getHistory(true);
@@ -535,17 +543,29 @@ export class GeminiClient {
       let totalRequestTokens = initialTokenCount;
 
       if (totalRequestTokens !== undefined) {
-        // For local models, be more aggressive with compression (50% threshold vs 90%)
-        const compressionThreshold = isLocalModel ? 0.5 : 0.9;
-        const approachingLimit = totalRequestTokens > sessionTokenLimit * compressionThreshold;
-        
+        // Use adaptive compression threshold based on system resources and model type
+        const compressionThreshold =
+          this.getAdaptiveCompressionThreshold(isLocalModel);
+        const approachingLimit =
+          totalRequestTokens > sessionTokenLimit * compressionThreshold;
+
         if (approachingLimit && !compressed) {
-          const additionalCompression = await this.tryCompressChat(prompt_id, true);
+          const additionalCompression = await this.tryCompressChat(
+            prompt_id,
+            true,
+          );
           if (additionalCompression) {
-            yield { type: GeminiEventType.ChatCompressed, value: additionalCompression };
-            
+            yield {
+              type: GeminiEventType.ChatCompressed,
+              value: additionalCompression,
+            };
+
             // Re-add IDE context if it was added before but got lost during compression
-            if (ideContextAdded && this.config.getIdeMode() && !hasPendingToolCall) {
+            if (
+              ideContextAdded &&
+              this.config.getIdeMode() &&
+              !hasPendingToolCall
+            ) {
               const { contextParts } = this.getIdeContextParts(
                 this.forceFullIdeContext || history.length === 0,
               );
@@ -556,7 +576,7 @@ export class GeminiClient {
                 });
               }
             }
-            
+
             // Recalculate tokens after additional compression (and IDE context re-addition)
             const newHistory = this.getChat().getHistory(true);
             const newMockRequestContent = [
@@ -566,13 +586,13 @@ export class GeminiClient {
               },
               ...newHistory,
             ];
-            
+
             const { totalTokens: newTotalRequestTokens } =
               await this.getContentGenerator().countTokens({
                 model: this.config.getModel(),
                 contents: newMockRequestContent,
               });
-            
+
             // Update the token count for the final check
             if (newTotalRequestTokens !== undefined) {
               totalRequestTokens = newTotalRequestTokens;
@@ -584,10 +604,17 @@ export class GeminiClient {
         if (isLocalModel && totalRequestTokens > sessionTokenLimit) {
           const finalCompression = await this.tryCompressChat(prompt_id, true);
           if (finalCompression) {
-            yield { type: GeminiEventType.ChatCompressed, value: finalCompression };
-            
+            yield {
+              type: GeminiEventType.ChatCompressed,
+              value: finalCompression,
+            };
+
             // Re-add IDE context if it was added before but got lost during compression
-            if (ideContextAdded && this.config.getIdeMode() && !hasPendingToolCall) {
+            if (
+              ideContextAdded &&
+              this.config.getIdeMode() &&
+              !hasPendingToolCall
+            ) {
               const { contextParts } = this.getIdeContextParts(
                 this.forceFullIdeContext || history.length === 0,
               );
@@ -598,7 +625,7 @@ export class GeminiClient {
                 });
               }
             }
-            
+
             // Recalculate tokens one more time
             const finalHistory = this.getChat().getHistory(true);
             const finalMockRequestContent = [
@@ -608,13 +635,13 @@ export class GeminiClient {
               },
               ...finalHistory,
             ];
-            
+
             const { totalTokens: finalTokenCount } =
               await this.getContentGenerator().countTokens({
                 model: this.config.getModel(),
                 contents: finalMockRequestContent,
               });
-            
+
             if (finalTokenCount !== undefined) {
               totalRequestTokens = finalTokenCount;
             }
@@ -635,7 +662,7 @@ export class GeminiClient {
           };
           return new Turn(this.getChat(), prompt_id);
         }
-        
+
         // For local models, if we still exceed after all compression attempts, just warn and continue
         if (totalRequestTokens > sessionTokenLimit && isLocalModel) {
           yield {

@@ -515,10 +515,10 @@ export const useGeminiStream = (
     (eventValue: ServerGeminiChatCompressedEvent['value']) => {
       const originalTokens = eventValue?.originalTokenCount ?? 0;
       const newTokens = eventValue?.newTokenCount ?? 0;
-      
+
       // Check if compression actually occurred
       const compressionSuccessful = newTokens < originalTokens;
-      
+
       const text = compressionSuccessful
         ? `IMPORTANT: This conversation approached the input token limit for ${config.getModel()}. ` +
           `A compressed context will be sent for future messages (compressed from: ` +
@@ -526,7 +526,7 @@ export const useGeminiStream = (
         : `IMPORTANT: This conversation has exceeded the input token limit for ${config.getModel()} ` +
           `(${originalTokens} tokens). Compression was attempted but could not reduce the context size. ` +
           `The conversation will continue but may experience degraded performance. Consider using /clear to reset.`;
-      
+
       return addItem(
         {
           type: compressionSuccessful ? 'info' : 'error',

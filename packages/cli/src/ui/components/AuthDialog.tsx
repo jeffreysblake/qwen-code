@@ -87,7 +87,9 @@ export function AuthDialog({
         setErrorMessage(null);
       } else if (
         authMethod === AuthType.LOCAL &&
-        (!process.env['OPENAI_API_KEY'] || !process.env['OPENAI_BASE_URL'] || !process.env['OPENAI_MODEL'])
+        (!process.env['OPENAI_API_KEY'] ||
+          !process.env['OPENAI_BASE_URL'] ||
+          !process.env['OPENAI_MODEL'])
       ) {
         setShowLocalConfigPrompt(true);
         setErrorMessage(null);
@@ -131,7 +133,9 @@ export function AuthDialog({
 
   const handleLocalConfigCancel = () => {
     setShowLocalConfigPrompt(false);
-    setErrorMessage('Local configuration is required to use local model authentication.');
+    setErrorMessage(
+      'Local configuration is required to use local model authentication.',
+    );
   };
 
   useKeypress(

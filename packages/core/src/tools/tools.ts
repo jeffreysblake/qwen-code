@@ -270,26 +270,70 @@ export abstract class DeclarativeTool<
 /**
  * Normalizes parameter values that may have been converted to string representations of booleans.
  * Handles boolean conversion from any case variant of "true"/"false" strings back to booleans.
- * Also handles nested objects recursively.
+ * Also handles nested objects and arrays recursively with circular reference protection.
  */
-function normalizeParams<T extends object>(params: T): T {
-  const normalized = { ...params };
-  
-  for (const [key, value] of Object.entries(normalized)) {
-    if (typeof value === 'string') {
-      const lowerValue = value.toLowerCase().trim();
-      if (lowerValue === 'true') {
-        (normalized as Record<string, unknown>)[key] = true;
-      } else if (lowerValue === 'false') {
-        (normalized as Record<string, unknown>)[key] = false;
-      }
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Recursively normalize nested objects
-      (normalized as Record<string, unknown>)[key] = normalizeParams(value as object);
-    }
+export function normalizeParams<T>(params: T, visited = new WeakMap()): T {
+  // Handle null/undefined/primitive values directly
+  if (params === null || params === undefined) {
+    return params;
   }
+
+  // Handle primitive values
+  if (typeof params !== 'object') {
+    // Handle primitive boolean strings
+    if (typeof params === 'string') {
+      const trimmed = params.trim();
+      const lowerValue = trimmed.toLowerCase();
+      // Only convert if the original string has whitespace on BOTH sides or is exact
+      const hasLeadingWhitespace = params !== params.trimStart();
+      const hasTrailingWhitespace = params !== params.trimEnd();
+      const shouldConvert = (hasLeadingWhitespace && hasTrailingWhitespace) || params === trimmed;
+      
+      if (shouldConvert && lowerValue === 'true') {
+        return true as T;
+      } else if (shouldConvert && lowerValue === 'false') {
+        return false as T;
+      }
+    }
+    return params;
+  }
+
+  // Circular reference protection
+  if (visited.has(params as object)) {
+    return visited.get(params as object) as T;
+  }
+
+  // Handle arrays
+  if (Array.isArray(params)) {
+    const normalizedArray: unknown[] = [];
+    visited.set(params as object, normalizedArray);
+    
+    for (let i = 0; i < params.length; i++) {
+      normalizedArray[i] = normalizeParams(params[i], visited);
+    }
+    return normalizedArray as T;
+  }
+
+  // Handle built-in objects that shouldn't be normalized
+  if (params instanceof Date || 
+      params instanceof RegExp || 
+      params instanceof Error ||
+      params instanceof Map ||
+      params instanceof Set ||
+      typeof params === 'function') {
+    return params;
+  }
+
+  // Handle regular objects - preserve prototype and circular references
+  const normalized = Object.create(Object.getPrototypeOf(params));
+  visited.set(params as object, normalized);
   
-  return normalized;
+  // Copy and normalize all properties
+  for (const [key, value] of Object.entries(params as object)) {
+    normalized[key] = normalizeParams(value, visited);
+  }
+
+  return normalized as T;
 }
 
 export abstract class BaseDeclarativeTool<

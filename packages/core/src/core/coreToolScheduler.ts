@@ -708,14 +708,10 @@ export class CoreToolScheduler {
         'User did not allow tool call',
       );
     } else if (outcome === ToolConfirmationOutcome.RejectWithFeedback) {
-      const feedbackMessage = payload?.feedback 
+      const feedbackMessage = payload?.feedback
         ? `User rejected tool call with feedback: ${payload.feedback}`
         : 'User rejected tool call and requested a different approach';
-      this.setStatusInternal(
-        callId,
-        'cancelled',
-        feedbackMessage,
-      );
+      this.setStatusInternal(callId, 'cancelled', feedbackMessage);
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
       if (isModifiableDeclarativeTool(waitingToolCall.tool)) {

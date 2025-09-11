@@ -453,7 +453,10 @@ describe('LoopDetectionService', () => {
         service.reset('');
 
         // Use unique content for each test to avoid any potential interference
-        const repeatedContent = createRepetitiveContent(index + 10, CONTENT_CHUNK_SIZE);
+        const repeatedContent = createRepetitiveContent(
+          index + 10,
+          CONTENT_CHUNK_SIZE,
+        );
 
         // Build up to near threshold
         for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
@@ -576,9 +579,13 @@ describe('LoopDetectionService', () => {
       service.addAndCheck(toolEvent);
 
       // Should start fresh - use completely different content to avoid any potential hash collisions
-      expect(service.addAndCheck(createContentEvent('Totally different new content that should not trigger any loops.'))).toBe(
-        false,
-      );
+      expect(
+        service.addAndCheck(
+          createContentEvent(
+            'Totally different new content that should not trigger any loops.',
+          ),
+        ),
+      ).toBe(false);
     });
   });
 

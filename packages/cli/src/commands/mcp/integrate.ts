@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { 
+import {
   getAvailableIntegrations,
   getIntegration,
   getIntegrationInfo,
@@ -50,20 +50,24 @@ async function handleIntegration(options: IntegrateOptions) {
   if (list) {
     console.log('🔌 Available MCP Integrations:\n');
     const integrations = getAvailableIntegrations();
-    
+
     for (const integration of integrations) {
       console.log(`📦 ${integration.name}`);
       console.log(`   ${integration.description}`);
       console.log('');
     }
-    
+
     console.log('💡 Use "qwen mcp integrate <name>" to install an integration');
-    console.log('💡 Use "qwen mcp integrate <name> --info" for detailed information');
+    console.log(
+      '💡 Use "qwen mcp integrate <name> --info" for detailed information',
+    );
     return;
   }
 
   if (!name) {
-    console.error('❌ Integration name is required. Use --list to see available integrations.');
+    console.error(
+      '❌ Integration name is required. Use --list to see available integrations.',
+    );
     process.exit(1);
   }
 
@@ -124,7 +128,9 @@ async function handleIntegration(options: IntegrateOptions) {
     const integration = getIntegration(name);
     if (!integration) {
       console.error(`❌ Unknown integration: ${name}`);
-      console.log('\n💡 Use "qwen mcp integrate --list" to see available integrations');
+      console.log(
+        '\n💡 Use "qwen mcp integrate --list" to see available integrations',
+      );
       process.exit(1);
     }
 
@@ -139,12 +145,14 @@ async function handleIntegration(options: IntegrateOptions) {
       await installFileSystemIntegration(integration, options);
     } else {
       // Generic installation
-      await installIntegration(name, options as unknown as Record<string, unknown>);
+      await installIntegration(
+        name,
+        options as unknown as Record<string, unknown>,
+      );
     }
 
     console.log(`\n✅ Successfully installed ${name} MCP integration!`);
     console.log('💡 Use "qwen mcp list" to see all configured MCP servers');
-    
   } catch (error) {
     console.error(`❌ Failed to install ${name}:`, error);
     process.exit(1);
@@ -152,8 +160,8 @@ async function handleIntegration(options: IntegrateOptions) {
 }
 
 async function installPlaywrightIntegration(
-  integration: PlaywrightMCPIntegration, 
-  options: IntegrateOptions
+  integration: PlaywrightMCPIntegration,
+  options: IntegrateOptions,
 ) {
   const { preset, headless, browser } = options;
 
@@ -176,8 +184,8 @@ async function installPlaywrightIntegration(
 }
 
 async function installGitIntegration(
-  integration: GitMCPIntegration, 
-  options: IntegrateOptions
+  integration: GitMCPIntegration,
+  options: IntegrateOptions,
 ) {
   const { readOnly, advanced } = options;
 
@@ -191,18 +199,18 @@ async function installGitIntegration(
 }
 
 async function installDatabaseIntegration(
-  integration: DatabaseMCPIntegration, 
-  options: IntegrateOptions
+  integration: DatabaseMCPIntegration,
+  options: IntegrateOptions,
 ) {
-  const { 
-    type, 
-    connectionString, 
-    database, 
-    host, 
-    port, 
-    username, 
+  const {
+    type,
+    connectionString,
+    database,
+    host,
+    port,
+    username,
     password,
-    readOnly 
+    readOnly,
   } = options;
 
   const dbOptions: Record<string, unknown> = {
@@ -224,8 +232,8 @@ async function installDatabaseIntegration(
 }
 
 async function installFileSystemIntegration(
-  integration: FileSystemMCPIntegration, 
-  options: IntegrateOptions
+  integration: FileSystemMCPIntegration,
+  options: IntegrateOptions,
 ) {
   const { directories, readOnly, watchFiles } = options;
 
@@ -241,7 +249,8 @@ async function installFileSystemIntegration(
 export const integrateCommand: CommandModule = {
   command: 'integrate [name]',
   describe: 'Install and manage pre-configured MCP integrations',
-  builder: (yargs) => yargs
+  builder: (yargs) =>
+    yargs
       .positional('name', {
         describe: 'Name of the integration to install',
         type: 'string',
@@ -329,11 +338,27 @@ export const integrateCommand: CommandModule = {
       })
       .example([
         ['$0 mcp integrate --list', 'List all available integrations'],
-        ['$0 mcp integrate playwright --info', 'Show Playwright integration details'],
-        ['$0 mcp integrate playwright --preset=development', 'Install Playwright for development'],
-        ['$0 mcp integrate git-advanced --read-only', 'Install Git integration in read-only mode'],
-        ['$0 mcp integrate database-sqlite --type=sqlite', 'Install SQLite database integration'],
-        ['$0 mcp integrate filesystem --directories=./src,./docs', 'Install File System with specific directories'],
+        [
+          '$0 mcp integrate playwright --info',
+          'Show Playwright integration details',
+        ],
+        [
+          '$0 mcp integrate playwright --preset=development',
+          'Install Playwright for development',
+        ],
+        [
+          '$0 mcp integrate git-advanced --read-only',
+          'Install Git integration in read-only mode',
+        ],
+        [
+          '$0 mcp integrate database-sqlite --type=sqlite',
+          'Install SQLite database integration',
+        ],
+        [
+          '$0 mcp integrate filesystem --directories=./src,./docs',
+          'Install File System with specific directories',
+        ],
       ]),
-  handler: (args: Record<string, unknown>) => handleIntegration(args as unknown as IntegrateOptions),
+  handler: (args: Record<string, unknown>) =>
+    handleIntegration(args as unknown as IntegrateOptions),
 };

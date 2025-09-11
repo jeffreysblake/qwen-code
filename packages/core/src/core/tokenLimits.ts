@@ -4,12 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  isLocalModel,
+  getLocalModelTokenLimit,
+} from '../utils/localModelUtils.js';
+
 type Model = string;
 type TokenCount = number;
 
-export const DEFAULT_TOKEN_LIMIT = 1_048_576;
+export const DEFAULT_TOKEN_LIMIT = 80_000;
 
-export function tokenLimit(model: Model): TokenCount {
+export function tokenLimit(model: Model, baseUrl?: string): TokenCount {
+  // Check if this is a local model deployment
+  if (isLocalModel(baseUrl, model)) {
+    return getLocalModelTokenLimit(model);
+  }
+
   // Add other models as they become relevant or if specified by config
   // Pulled from https://ai.google.dev/gemini-api/docs/models
   switch (model) {
@@ -25,8 +35,8 @@ export function tokenLimit(model: Model): TokenCount {
     case 'gemini-2.0-flash':
       return 1_048_576;
     case 'gemini-2.0-flash-preview-image-generation':
-      return 32_000;
+      return Math.max(32_000, 80_000); // Ensure minimum 80k context
     default:
-      return DEFAULT_TOKEN_LIMIT;
+      return Math.max(DEFAULT_TOKEN_LIMIT, 80_000); // Ensure minimum 80k context
   }
 }

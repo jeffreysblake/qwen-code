@@ -106,29 +106,37 @@ describe('ShellTool', () => {
       });
       expect(invocation).toBeDefined();
     });
-    
+
     it('should normalize string boolean values', () => {
       // Test various string representations of booleans
       // TypeScript casting is needed here since we're testing runtime behavior
-      expect(() => shellTool.build({
-        command: 'ls -l',
-        is_background: 'false' as unknown as boolean,
-      })).not.toThrow();
-      
-      expect(() => shellTool.build({
-        command: 'ls -l',
-        is_background: 'False' as unknown as boolean,
-      })).not.toThrow();
-      
-      expect(() => shellTool.build({
-        command: 'ls -l',
-        is_background: 'TRUE' as unknown as boolean,
-      })).not.toThrow();
-      
-      expect(() => shellTool.build({
-        command: 'ls -l',
-        is_background: 'True' as unknown as boolean,
-      })).not.toThrow();
+      expect(() =>
+        shellTool.build({
+          command: 'ls -l',
+          is_background: 'false' as unknown as boolean,
+        }),
+      ).not.toThrow();
+
+      expect(() =>
+        shellTool.build({
+          command: 'ls -l',
+          is_background: 'False' as unknown as boolean,
+        }),
+      ).not.toThrow();
+
+      expect(() =>
+        shellTool.build({
+          command: 'ls -l',
+          is_background: 'TRUE' as unknown as boolean,
+        }),
+      ).not.toThrow();
+
+      expect(() =>
+        shellTool.build({
+          command: 'ls -l',
+          is_background: 'True' as unknown as boolean,
+        }),
+      ).not.toThrow();
     });
 
     it('should throw an error for an empty command', () => {

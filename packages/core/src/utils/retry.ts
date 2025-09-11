@@ -11,6 +11,7 @@ import {
   isQwenQuotaExceededError,
   isQwenThrottlingError,
 } from './quotaErrorDetection.js';
+import { getLocalModelRetryConfig } from './localModelUtils.js';
 
 export interface HttpError extends Error {
   status?: number;
@@ -34,6 +35,21 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxDelayMs: 30000, // 30 seconds
   shouldRetry: defaultShouldRetry,
 };
+
+/**
+ * Gets retry options optimized for local models
+ */
+export function getRetryOptionsForAuthType(authType?: string): RetryOptions {
+  if (authType === 'local') {
+    const localConfig = getLocalModelRetryConfig();
+    return {
+      ...DEFAULT_RETRY_OPTIONS,
+      ...localConfig,
+    };
+  }
+
+  return DEFAULT_RETRY_OPTIONS;
+}
 
 /**
  * Default predicate function to determine if a retry should be attempted.

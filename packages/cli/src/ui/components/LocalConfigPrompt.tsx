@@ -17,8 +17,12 @@ export function LocalConfigPrompt({
   onSubmit,
   onCancel,
 }: LocalConfigPromptProps): React.JSX.Element {
-  const [apiKey, setApiKey] = useState(process.env['OPENAI_API_KEY'] || 'lm-studio');
-  const [baseUrl, setBaseUrl] = useState(process.env['OPENAI_BASE_URL'] || 'http://127.0.0.1:1234/v1');
+  const [apiKey, setApiKey] = useState(
+    process.env['OPENAI_API_KEY'] || 'lm-studio',
+  );
+  const [baseUrl, setBaseUrl] = useState(
+    process.env['OPENAI_BASE_URL'] || 'http://127.0.0.1:1234/v1',
+  );
   const [model, setModel] = useState(process.env['OPENAI_MODEL'] || '');
   const [currentField, setCurrentField] = useState<
     'apiKey' | 'baseUrl' | 'model'
@@ -141,8 +145,8 @@ export function LocalConfigPrompt({
       </Text>
       <Box marginTop={1}>
         <Text>
-          Configure your local LLM endpoint. This is typically used with
-          LM Studio, Ollama, or other local model servers.
+          Configure your local LLM endpoint. This is typically used with LM
+          Studio, Ollama, or other local model servers.
         </Text>
       </Box>
       <Box marginTop={1} flexDirection="row">
@@ -197,7 +201,8 @@ export function LocalConfigPrompt({
       </Box>
       <Box marginTop={1}>
         <Text color={Colors.Gray}>
-          Note: API Key can be any value for local models (e.g., &quot;lm-studio&quot;)
+          Note: API Key can be any value for local models (e.g.,
+          &quot;lm-studio&quot;)
         </Text>
       </Box>
     </Box>

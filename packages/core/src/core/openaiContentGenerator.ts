@@ -31,6 +31,15 @@ import { ApiErrorEvent, ApiResponseEvent } from '../telemetry/types.js';
 import { Config } from '../config/config.js';
 import { openaiLogger } from '../utils/openaiLogger.js';
 import { safeJsonParse } from '../utils/safeJsonParse.js';
+import {
+  isLocalModel,
+  getLocalModelSamplingParams,
+  detectLocalModelCapabilities,
+} from '../utils/localModelUtils.js';
+import {
+  LocalModelConcurrencyManager,
+  ConcurrencyConfig,
+} from '../utils/localModelConcurrencyManager.js';
 
 // Extended types to support cache_control
 interface ChatCompletionContentPartTextWithCache
@@ -95,6 +104,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
   private model: string;
   private contentGeneratorConfig: ContentGeneratorConfig;
   private config: Config;
+  private concurrencyManager?: LocalModelConcurrencyManager;
   private streamingToolCalls: Map<
     number,
     {
@@ -142,6 +152,19 @@ export class OpenAIContentGenerator implements ContentGenerator {
       maxRetries: contentGeneratorConfig.maxRetries ?? 3,
       defaultHeaders,
     });
+
+    // Initialize concurrency manager for local models
+    if (isLocalModel(contentGeneratorConfig.baseUrl, this.model)) {
+      const localConfig = detectLocalModelCapabilities();
+      const concurrencyConfig: ConcurrencyConfig = {
+        maxConcurrentRequests: localConfig.maxConcurrentRequests || 2,
+        queueTimeout: 120000, // 2 minutes
+        adaptiveThrottling: true,
+      };
+      this.concurrencyManager = new LocalModelConcurrencyManager(
+        concurrencyConfig,
+      );
+    }
   }
 
   /**
@@ -300,10 +323,19 @@ export class OpenAIContentGenerator implements ContentGenerator {
       false,
     );
 
-    try {
-      const completion = (await this.client.chat.completions.create(
+    const executeRequest = async () =>
+      (await this.client.chat.completions.create(
         createParams,
       )) as OpenAI.Chat.ChatCompletion;
+
+    try {
+      const completion = this.concurrencyManager
+        ? await this.executeConcurrentRequest(
+            userPromptId,
+            executeRequest,
+            request.config?.abortSignal,
+          )
+        : await executeRequest();
 
       const response = this.convertToGeminiFormat(completion);
       const durationMs = Date.now() - startTime;
@@ -395,10 +427,19 @@ export class OpenAIContentGenerator implements ContentGenerator {
       true,
     );
 
-    try {
-      const stream = (await this.client.chat.completions.create(
+    const executeStreamRequest = async () =>
+      (await this.client.chat.completions.create(
         createParams,
       )) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+
+    try {
+      const stream = this.concurrencyManager
+        ? await this.executeConcurrentRequest(
+            userPromptId,
+            executeStreamRequest,
+            request.config?.abortSignal,
+          )
+        : await executeStreamRequest();
 
       const originalStream = this.streamGenerator(stream);
 
@@ -1535,46 +1576,66 @@ export class OpenAIContentGenerator implements ContentGenerator {
    * Build sampling parameters with clear priority:
    * 1. Config-level sampling parameters (highest priority)
    * 2. Request-level parameters (medium priority)
-   * 3. Default values (lowest priority)
+   * 3. Local model optimized defaults (for local deployments)
+   * 4. Standard defaults (lowest priority)
    */
   private buildSamplingParameters(
     request: GenerateContentParameters,
   ): Record<string, unknown> {
     const configSamplingParams = this.contentGeneratorConfig.samplingParams;
 
+    // Detect if this is a local model deployment
+    const isLocal = isLocalModel(
+      this.contentGeneratorConfig.baseUrl,
+      this.model,
+    );
+
+    // Get optimized defaults for local models
+    const localDefaults = isLocal ? getLocalModelSamplingParams() : {};
+
     const params = {
-      // Temperature: config > request > default
+      // Temperature: config > request > local optimized > standard default
       temperature:
         configSamplingParams?.temperature !== undefined
           ? configSamplingParams.temperature
           : request.config?.temperature !== undefined
             ? request.config.temperature
-            : 0.0,
+            : isLocal && localDefaults['temperature'] !== undefined
+              ? localDefaults['temperature']
+              : 0.0,
 
-      // Max tokens: config > request > undefined
+      // Max tokens: config > request > local optimized > undefined
       ...(configSamplingParams?.max_tokens !== undefined
         ? { max_tokens: configSamplingParams.max_tokens }
         : request.config?.maxOutputTokens !== undefined
           ? { max_tokens: request.config.maxOutputTokens }
-          : {}),
+          : isLocal && localDefaults['max_tokens'] !== undefined
+            ? { max_tokens: localDefaults['max_tokens'] }
+            : {}),
 
-      // Top-p: config > request > default
+      // Top-p: config > request > local optimized > standard default
       top_p:
         configSamplingParams?.top_p !== undefined
           ? configSamplingParams.top_p
           : request.config?.topP !== undefined
             ? request.config.topP
-            : 1.0,
+            : isLocal && localDefaults['top_p'] !== undefined
+              ? localDefaults['top_p']
+              : 1.0,
 
-      // Top-k: config only (not available in request)
+      // Top-k: config > local optimized > undefined
       ...(configSamplingParams?.top_k !== undefined
         ? { top_k: configSamplingParams.top_k }
-        : {}),
+        : isLocal && localDefaults['top_k'] !== undefined
+          ? { top_k: localDefaults['top_k'] }
+          : {}),
 
-      // Repetition penalty: config only
+      // Repetition penalty: config > local optimized > undefined
       ...(configSamplingParams?.repetition_penalty !== undefined
         ? { repetition_penalty: configSamplingParams.repetition_penalty }
-        : {}),
+        : isLocal && localDefaults['repetition_penalty'] !== undefined
+          ? { repetition_penalty: localDefaults['repetition_penalty'] }
+          : {}),
 
       // Presence penalty: config only
       ...(configSamplingParams?.presence_penalty !== undefined
@@ -1588,6 +1649,25 @@ export class OpenAIContentGenerator implements ContentGenerator {
     };
 
     return params;
+  }
+
+  /**
+   * Execute a request through the concurrency manager for local models
+   */
+  private async executeConcurrentRequest<T>(
+    requestId: string,
+    requestFn: () => Promise<T>,
+    abortSignal?: AbortSignal,
+  ): Promise<T> {
+    if (!this.concurrencyManager) {
+      throw new Error('Concurrency manager not initialized');
+    }
+
+    return this.concurrencyManager.executeRequest(
+      requestId,
+      requestFn,
+      abortSignal,
+    );
   }
 
   private mapFinishReason(openaiReason: string | null): FinishReason {

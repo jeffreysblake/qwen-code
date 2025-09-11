@@ -201,7 +201,7 @@ export class LoopDetectionService {
   private hasObviousRepetition(content: string): boolean {
     // Check both the new content and the recent accumulated history
     const textsToCheck = [content];
-    
+
     // Also check the last 300 characters of accumulated history for patterns
     if (this.streamContentHistory.length > 0) {
       const recentHistory = this.streamContentHistory.slice(-300);
@@ -214,7 +214,9 @@ export class LoopDetectionService {
       const charRepeatPattern = /([^#\-*_=\s.,'"()])\1{15,}/g; // Increased from 8 to 15
       const charMatches = text.match(charRepeatPattern);
       if (charMatches) {
-        console.error(`[LOOP DEBUG] Character repetition detected: ${charMatches.join(', ')}`);
+        console.error(
+          `[LOOP DEBUG] Character repetition detected: ${charMatches.join(', ')}`,
+        );
         return true;
       }
 
@@ -224,7 +226,7 @@ export class LoopDetectionService {
         return true;
       }
 
-     // Check for extremely dense repetitive content (very high threshold)
+      // Check for extremely dense repetitive content (very high threshold)
       const suspiciousLength = 100;
       if (text.length > suspiciousLength) {
         const quoteCount = (text.match(/"/g) || []).length;
@@ -371,10 +373,13 @@ export class LoopDetectionService {
     // Skip LLM loop detection for OpenAI models since generateJson doesn't work properly
     const contentGeneratorConfig = this.config.getContentGeneratorConfig();
     if (contentGeneratorConfig?.authType === 'openai') {
-      this.config.getDebugMode() && console.log('[Loop Detection] Skipping LLM loop check for OpenAI models');
+      this.config.getDebugMode() &&
+        console.log(
+          '[Loop Detection] Skipping LLM loop check for OpenAI models',
+        );
       return false;
     }
-    
+
     const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
@@ -480,19 +485,19 @@ Please analyze the conversation history to determine the possibility that the co
    */
   getLoopRecoveryPrompts(): string[] {
     const basePrompts = [
-      "Let me take a step back and approach this differently. What specific aspect should I focus on first?",
+      'Let me take a step back and approach this differently. What specific aspect should I focus on first?',
       "I notice I might be repeating myself. Can you provide more specific guidance on what you'd like me to do differently?",
       "Let me break this down into smaller, more manageable steps. What's the most important part to address first?",
     ];
 
     const toolCallPrompts = [
-      "I seem to be stuck in a loop with tool calls. Let me try a different approach to this problem.",
+      'I seem to be stuck in a loop with tool calls. Let me try a different approach to this problem.',
       "Instead of repeating the same operations, let me analyze what we've learned so far and adjust my strategy.",
     ];
 
     const contentPrompts = [
       "I notice I'm generating repetitive content. Let me refocus on providing more specific and actionable information.",
-      "Let me restructure my response to be more targeted and avoid repetition.",
+      'Let me restructure my response to be more targeted and avoid repetition.',
     ];
 
     // Return different prompts based on what type of loop was detected

@@ -30,10 +30,12 @@ export interface DatabaseIntegrationOptions {
 export class DatabaseMCPIntegration extends BaseMCPIntegration {
   private databaseType: string;
 
-  constructor(databaseType: 'sqlite' | 'postgresql' | 'mysql' | 'multi' = 'multi') {
+  constructor(
+    databaseType: 'sqlite' | 'postgresql' | 'mysql' | 'multi' = 'multi',
+  ) {
     super(
       `database-${databaseType}`,
-      `${databaseType.toUpperCase()} database access with SQL query execution, schema inspection, and data analysis capabilities.`
+      `${databaseType.toUpperCase()} database access with SQL query execution, schema inspection, and data analysis capabilities.`,
     );
     this.databaseType = databaseType;
   }
@@ -41,7 +43,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
   async checkDependencies(): Promise<boolean> {
     // Check if Node.js version is compatible
     if (!this.checkNodeVersion('18.0.0')) {
-      console.error('❌ Node.js version 18.0.0 or higher is required for Database MCP');
+      console.error(
+        '❌ Node.js version 18.0.0 or higher is required for Database MCP',
+      );
       return false;
     }
 
@@ -59,13 +63,17 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
       case 'postgresql':
         // Check if psql is available (optional but recommended)
         if (!this.commandExists('psql')) {
-          console.warn('⚠️  PostgreSQL client (psql) not found. MCP server will still work, but some features may be limited.');
+          console.warn(
+            '⚠️  PostgreSQL client (psql) not found. MCP server will still work, but some features may be limited.',
+          );
         }
         break;
       case 'mysql':
         // Check if mysql client is available (optional but recommended)
         if (!this.commandExists('mysql')) {
-          console.warn('⚠️  MySQL client not found. MCP server will still work, but some features may be limited.');
+          console.warn(
+            '⚠️  MySQL client not found. MCP server will still work, but some features may be limited.',
+          );
         }
         break;
       default:
@@ -82,11 +90,17 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           console.log('📦 Installing SQLite MCP server...');
           // Try official SQLite MCP server first
           try {
-            execSync('npx --yes @modelcontextprotocol/server-sqlite --help', { stdio: 'pipe', timeout: 30000 });
+            execSync('npx --yes @modelcontextprotocol/server-sqlite --help', {
+              stdio: 'pipe',
+              timeout: 30000,
+            });
             console.log('✅ Official SQLite MCP server available');
           } catch {
             // Fallback to community implementation
-            execSync('npx --yes mcp-sqlite --help', { stdio: 'pipe', timeout: 30000 });
+            execSync('npx --yes mcp-sqlite --help', {
+              stdio: 'pipe',
+              timeout: 30000,
+            });
             console.log('✅ Community SQLite MCP server available');
           }
           break;
@@ -94,18 +108,27 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
         case 'postgresql':
           console.log('📦 Installing PostgreSQL MCP server...');
           try {
-            execSync('npx --yes @modelcontextprotocol/server-postgres --help', { stdio: 'pipe', timeout: 30000 });
+            execSync('npx --yes @modelcontextprotocol/server-postgres --help', {
+              stdio: 'pipe',
+              timeout: 30000,
+            });
             console.log('✅ Official PostgreSQL MCP server available');
           } catch {
             // Fallback to community implementation
-            execSync('npx --yes postgres-mcp --help', { stdio: 'pipe', timeout: 30000 });
+            execSync('npx --yes postgres-mcp --help', {
+              stdio: 'pipe',
+              timeout: 30000,
+            });
             console.log('✅ Community PostgreSQL MCP server available');
           }
           break;
 
         case 'mysql':
           console.log('📦 Installing MySQL MCP server...');
-          execSync('npx --yes mcp-server-mysql --help', { stdio: 'pipe', timeout: 30000 });
+          execSync('npx --yes mcp-server-mysql --help', {
+            stdio: 'pipe',
+            timeout: 30000,
+          });
           console.log('✅ MySQL MCP server available');
           break;
 
@@ -113,11 +136,17 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           console.log('📦 Installing Multi-database MCP server...');
           // Install the comprehensive mcp-alchemy server
           try {
-            execSync('pip install mcp-alchemy', { stdio: 'inherit', timeout: 60000 });
+            execSync('pip install mcp-alchemy', {
+              stdio: 'inherit',
+              timeout: 60000,
+            });
             console.log('✅ MCP Alchemy multi-database server installed');
           } catch {
             // Try with uvx if pip fails
-            execSync('uvx --from mcp-alchemy mcp-alchemy --help', { stdio: 'pipe', timeout: 30000 });
+            execSync('uvx --from mcp-alchemy mcp-alchemy --help', {
+              stdio: 'pipe',
+              timeout: 30000,
+            });
             console.log('✅ MCP Alchemy available via uvx');
           }
           break;
@@ -125,12 +154,20 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           throw new Error(`Unsupported database type: ${this.databaseType}`);
       }
     } catch (error) {
-      throw new Error(`Failed to install ${this.databaseType} MCP server: ${error}`);
+      throw new Error(
+        `Failed to install ${this.databaseType} MCP server: ${error}`,
+      );
     }
   }
 
   getServerConfig(options?: Record<string, unknown>): MCPServerConfig {
-    const dbOptions = (options as unknown as DatabaseIntegrationOptions) || { databaseType: this.databaseType as 'sqlite' | 'postgresql' | 'mysql' | 'multi' };
+    const dbOptions = (options as unknown as DatabaseIntegrationOptions) || {
+      databaseType: this.databaseType as
+        | 'sqlite'
+        | 'postgresql'
+        | 'mysql'
+        | 'multi',
+    };
     const {
       connectionString,
       databasePath,
@@ -165,7 +202,8 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           env['DATABASE_URL'] = connectionString;
         } else if (host && database) {
           const defaultPort = port || 5432;
-          env['DATABASE_URL'] = `postgresql://${username}:${password}@${host}:${defaultPort}/${database}`;
+          env['DATABASE_URL'] =
+            `postgresql://${username}:${password}@${host}:${defaultPort}/${database}`;
         }
         break;
 
@@ -229,7 +267,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
         if (config.args && config.args.length > 2) {
           const dbPath = config.args[config.args.length - 1];
           if (!this.fileExists(dbPath) && !dbPath.includes(':memory:')) {
-            console.warn(`⚠️  SQLite database file ${dbPath} does not exist. It will be created when first accessed.`);
+            console.warn(
+              `⚠️  SQLite database file ${dbPath} does not exist. It will be created when first accessed.`,
+            );
           }
         }
         break;
@@ -237,7 +277,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
       case 'postgresql':
       case 'mysql':
         if (!config.env?.['DATABASE_URL'] && !config.env?.['MYSQL_HOST']) {
-          console.error(`❌ Database connection information missing for ${this.databaseType}`);
+          console.error(
+            `❌ Database connection information missing for ${this.databaseType}`,
+          );
           return false;
         }
         break;
@@ -317,41 +359,41 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
    */
   getAvailableTools(): string[] {
     const commonTools = [
-      'query',              // Execute SQL queries
-      'list_tables',        // List all tables
-      'describe_table',     // Get table schema
-      'list_columns',       // List columns in a table
-      'get_table_info',     // Get detailed table information
+      'query', // Execute SQL queries
+      'list_tables', // List all tables
+      'describe_table', // Get table schema
+      'list_columns', // List columns in a table
+      'get_table_info', // Get detailed table information
     ];
 
     const readWriteTools = [
-      'create_table',       // Create new tables
-      'drop_table',         // Delete tables
-      'insert_data',        // Insert data
-      'update_data',        // Update data
-      'delete_data',        // Delete data
-      'create_index',       // Create indexes
-      'drop_index',         // Delete indexes
+      'create_table', // Create new tables
+      'drop_table', // Delete tables
+      'insert_data', // Insert data
+      'update_data', // Update data
+      'delete_data', // Delete data
+      'create_index', // Create indexes
+      'drop_index', // Delete indexes
     ];
 
     switch (this.databaseType) {
       case 'sqlite':
         return [
           ...commonTools,
-          'attach_database',   // Attach additional databases
-          'detach_database',   // Detach databases
-          'vacuum',            // Optimize database
-          'analyze',           // Update query planner statistics
+          'attach_database', // Attach additional databases
+          'detach_database', // Detach databases
+          'vacuum', // Optimize database
+          'analyze', // Update query planner statistics
           ...readWriteTools,
         ];
 
       case 'postgresql':
         return [
           ...commonTools,
-          'list_schemas',      // List database schemas
-          'list_functions',    // List stored functions
-          'list_views',        // List views
-          'explain_query',     // Get query execution plan
+          'list_schemas', // List database schemas
+          'list_functions', // List stored functions
+          'list_views', // List views
+          'explain_query', // Get query execution plan
           'analyze_performance', // Performance analysis
           ...readWriteTools,
         ];
@@ -359,9 +401,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
       case 'mysql':
         return [
           ...commonTools,
-          'list_databases',    // List all databases
-          'show_processlist',  // Show running processes
-          'explain_query',     // Get query execution plan
+          'list_databases', // List all databases
+          'show_processlist', // Show running processes
+          'explain_query', // Get query execution plan
           ...readWriteTools,
         ];
 
@@ -370,9 +412,9 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           ...commonTools,
           'list_databases',
           'list_schemas',
-          'migrate_data',      // Data migration between databases
-          'compare_schemas',   // Compare database schemas
-          'sync_data',         // Synchronize data between databases
+          'migrate_data', // Data migration between databases
+          'compare_schemas', // Compare database schemas
+          'sync_data', // Synchronize data between databases
           ...readWriteTools,
         ];
 
@@ -407,7 +449,8 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
           ...examples,
           'List schemas': 'Show all schemas in the database',
           'Explain query': 'Explain the execution plan for a complex query',
-          'Performance analysis': 'Analyze slow queries and suggest optimizations',
+          'Performance analysis':
+            'Analyze slow queries and suggest optimizations',
         };
 
       case 'mysql':
@@ -421,7 +464,8 @@ export class DatabaseMCPIntegration extends BaseMCPIntegration {
       case 'multi':
         return {
           ...examples,
-          'Compare schemas': 'Compare schema differences between development and production',
+          'Compare schemas':
+            'Compare schema differences between development and production',
           'Migrate data': 'Migrate data from MySQL to PostgreSQL',
           'Sync databases': 'Synchronize data between two database instances',
         };
